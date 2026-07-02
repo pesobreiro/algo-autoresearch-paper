@@ -1,0 +1,158 @@
+{
+  "iteracao": 1077,
+  "season": 11,
+  "model_hash": "76e25c4b",
+  "metricas": {
+    "sharpe_raw": 1.690776626845297,
+    "sharpe_validation": 1.690776626845297,
+    "sharpe_holdout": 2.577734124669761,
+    "sortino_raw": 3.646034343502535,
+    "retorno_anual_pct": 15.690804159255606,
+    "max_drawdown_pct": -8.89011658324559,
+    "win_rate_pct": 81.25,
+    "n_trades": 182,
+    "score_composto": 1.4729291732305752,
+    "sl_pct": 7.850171598131896,
+    "tp_pct": 7.067039552590512,
+    "threshold": 0.8567763154754653,
+    "equity_500_final": 773.53,
+    "equity_500_por_ano": {
+      "2022": 597.97,
+      "2023": 675.42,
+      "2024": 773.53,
+      "2025": 595.52
+    },
+    "retorno_total_oos_pct": 19.1,
+    "n_trials_optuna": 200,
+    "optuna_param_importance": {
+      "TP_RANGE": 0.5481,
+      "THRESHOLD_RANGE": 0.3777,
+      "SL_RANGE": 0.0742
+    },
+    "drawdown_forensics": {
+      "ano": 2022,
+      "dur_dias": 13.0,
+      "profundidade": -8.6,
+      "adx_medio": 25.4,
+      "adx_minimo": 8.2,
+      "regime": "Tendência Fraca (ADX 20-30)"
+    },
+    "top_features": [
+      [
+        "stoch_rsi_k_15m",
+        0.0821
+      ],
+      [
+        "macd_pct_1d",
+        0.0493
+      ],
+      [
+        "ema_diff_1d",
+        0.0382
+      ],
+      [
+        "ema_diff_4h",
+        0.0358
+      ],
+      [
+        "adx_1d",
+        0.0338
+      ],
+      [
+        "bb_position_4h",
+        0.0331
+      ],
+      [
+        "macd_signal_pct_4h",
+        0.0324
+      ],
+      [
+        "macd_hist_pct_15m",
+        0.0308
+      ]
+    ],
+    "bottom_features": [
+      [
+        "returns_5_15m",
+        0.0165
+      ],
+      [
+        "stoch_rsi_k_4h",
+        0.0157
+      ],
+      [
+        "trend_15m",
+        0.0
+      ],
+      [
+        "trend_4h",
+        0.0
+      ],
+      [
+        "trend_1d",
+        0.0
+      ]
+    ],
+    "cv_auc_mean": 0.5720758847678808,
+    "cv_auc_std": 0.11795115225417624,
+    "xgb_optuna_best": {}
+  },
+  "params": {
+    "FEATURES": [
+      "ema_diff_1d",
+      "macd_pct_1d",
+      "macd_signal_pct_1d",
+      "returns_5_15m",
+      "dist_sma200_pct",
+      "btc_trend",
+      "atr_pct_1d",
+      "adx_1d",
+      "rsi_1d",
+      "stoch_rsi_k_1d",
+      "volume_norm",
+      "ema_diff_4h",
+      "bb_width_pct_15m"
+    ],
+    "TIMEFRAMES": [
+      "15m",
+      "4h",
+      "1d"
+    ],
+    "STOCH_RSI_PERIOD": 14,
+    "ADX_PERIOD": 20,
+    "EMA_FAST": 12,
+    "EMA_SLOW": 80,
+    "BB_PERIOD": 28,
+    "ENTRY_STOCH_THRESHOLD": 0.45,
+    "ENTRY_ADX_THRESHOLD": 22,
+    "N_ESTIMATORS": 1000,
+    "MAX_DEPTH": 8,
+    "LEARNING_RATE": 0.05,
+    "MIN_CHILD_WEIGHT": 7,
+    "GAMMA": 0.25,
+    "SUBSAMPLE": 0.85,
+    "COLSAMPLE_BYTREE": 0.8,
+    "REG_ALPHA": 3.0,
+    "REG_LAMBDA": 4.0,
+    "SL_RANGE": [
+      4.5,
+      9.5
+    ],
+    "TP_RANGE": [
+      5.5,
+      13.5
+    ],
+    "THRESHOLD_RANGE": [
+      0.85,
+      0.89
+    ],
+    "N_TRIALS": 200,
+    "DEPTH_RANGE": null,
+    "LR_RANGE": null,
+    "ESTIMATORS_RANGE": null,
+    "ALPHA_RANGE": null,
+    "LAMBDA_RANGE": null,
+    "N_TRIALS_XGB": 0,
+    "OBJECTIVE_MODE": "score"
+  }
+}
