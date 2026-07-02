@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.venv/
+venv/
+
+# Python packaging / build artifacts
+build/
+dist/
+.coverage
+htmlcov/
+
+# Data / caches
+data/*.parquet
+data/*.csv
+cache/
+*.log
+logs/
+
+# LLM build and model weights
+llm/llama.cpp/
+*.gguf
+*.bin
+*.safetensors
+
+# ML / trading model artifacts
+best_models/
+models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# Experiment directories
+experiments*/
+experiments_s*/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX build
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.out
+
+# Local configs
+config.yaml
+.env
