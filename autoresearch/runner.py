@@ -1,15 +1,15 @@
 """
-Runner principal — loop de pesquisa autónoma.
+Main runner — autonomous research loop.
 
-Fluxo por iteração:
-  1. Carregar research_params.py atual
-  2. LLM propor novo research_params.py
-  3. Validar sintaxe + indicadores relativos
-  4. Correr pipeline (labels → treino → backtest)
-  5. Calcular score e comparar com baseline
-  6. Aceitar ou reverter
-  7. Registar experiência
-  8. [Opcional] Revisão humana
+Flow per iteration:
+  1. Load current research_params.py
+  2. LLM proposes new research_params.py
+  3. Validate syntax + relative indicators
+  4. Run pipeline (labels → train → backtest)
+  5. Calculate score and compare with baseline
+  6. Accept or revert
+  7. Register experience
+  8. [Optional] Human review
 """
 import gc
 import shutil
@@ -21,11 +21,11 @@ from rich.console import Console
 from rich.panel import Panel
 
 from autoresearch.agent import (
-    propor_novos_params, validar_codigo, verificar_servidor_llm
+    propose_new_params, validate_code, check_llm_server
 )
-from autoresearch.tracker import Tracker, RegistoExperiencia
+from autoresearch.tracker import Tracker, ExperimentRecord
 from autoresearch.human_loop import (
-    mostrar_resultado_iteracao, mostrar_params_propostos, solicitar_revisao_humana
+    show_iteration_result, show_proposed_params, request_human_review
 )
 from pipeline.run_pipeline import executar_pipeline, carregar_params, hash_entry_params, hash_params_completo
 
@@ -33,30 +33,30 @@ console = Console()
 
 
 def _fmt_num(v, decimals=2, sign=False):
-    """Formata número com `decimals` casas decimais; valores não-numéricos são devolvidos como string."""
+    """Formats a number with `decimals` decimal places; non-numeric values are returned as string."""
     if isinstance(v, (int, float)):
         fmt = f"{{:{'+' if sign else ''}.{decimals}f}}"
         return fmt.format(v)
     return str(v)
 
 
-def verificar_pre_requisitos(config: dict) -> tuple[bool, list[str]]:
+def check_prerequisites(config: dict) -> tuple[bool, list[str]]:
     """
-    Verifica pré-requisitos antes de iniciar o loop.
+    Checks prerequisites before starting the loop.
 
     Returns:
-        (ok, lista_de_erros)
+        (ok, error_list)
     """
-    erros = []
+    errors = []
 
-    # Servidor LLM
+    # LLM Server
     server_url = config.get('llm', {}).get('server_url', 'http://localhost:8080')
-    if not verificar_servidor_llm(server_url):
-        erros.append(f"LLM server não acessível em {server_url}\n"
-                     f"  Iniciar com: ./llm/llama.cpp/build/bin/llama-server "
+    if not check_llm_server(server_url):
+        errors.append(f"LLM server not accessible at {server_url}\n"
+                     f"  Start with: ./llm/llama.cpp/build/bin/llama-server "
                      f"--model models/*.gguf --port 8080 --n-gpu-layers 32")
 
-    # Dados
+    # Data
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -66,44 +66,48 @@ def verificar_pre_requisitos(config: dict) -> tuple[bool, list[str]]:
         ticker = config['pipeline']['ticker']
         exchange = config['pipeline'].get('exchange', 'binance')
 
-        f15m = None
+        file_15m = None
         for cand in [f'{ticker}_15m_usdt_{exchange}.parquet',
                      f'{ticker}_15m_usdt_binance.parquet',
                      f'{ticker}_15m_usdt.parquet']:
             p = Path(data_dir) / cand
             if p.exists():
-                f15m = p
+                file_15m = p
                 break
-        if f15m is None:
-            erros.append(f"Dados 15m não encontrados para {ticker} em {data_dir}")
+        if file_15m is None:
+            errors.append(f"15m data not found for {ticker} in {data_dir}")
     except Exception as e:
-        erros.append(f"Erro ao verificar dados: {e}")
+        errors.append(f"Error checking data: {e}")
 
     # research_params.py
     params_path = Path(__file__).parent.parent / 'pipeline' / 'research_params.py'
     if not params_path.exists():
-        erros.append(f"research_params.py não encontrado: {params_path}")
+        errors.append(f"research_params.py not found: {params_path}")
     else:
         try:
             params = carregar_params(params_path)
-            ok, msg = validar_codigo(params_path.read_text())
+            ok, message = validate_code(params_path.read_text())
             if not ok:
-                erros.append(f"research_params.py inválido: {msg}")
+                errors.append(f"research_params.py invalid: {message}")
         except Exception as e:
-            erros.append(f"Erro ao carregar research_params.py: {e}")
+            errors.append(f"Error loading research_params.py: {e}")
 
-    return len(erros) == 0, erros
+    return len(errors) == 0, errors
 
 
-def limpar_cache(cache_dir: Path, params_hash_atual: str,
-                 modelo_hash_atual: str, keep_labels: int = 3, keep_models: int = 5):
+# Backward-compatible alias used by main.py
+verificar_pre_requisitos = check_prerequisites
+
+
+def clean_cache(cache_dir: Path, current_params_hash: str,
+                current_model_hash: str, keep_labels: int = 3, keep_models: int = 5):
     """
-    Remove labels e modelos antigos do cache.
+    Removes old labels and models from cache.
 
-    Mantém:
-      - Os últimos `keep_labels` ficheiros de labels por data de modificação
-      - Os últimos `keep_models` dirs de modelos por data de modificação
-      - Sempre preserva o hash actual (labels + modelo)
+    Keeps:
+      - The latest `keep_labels` label files by modification time
+      - The latest `keep_models` model dirs by modification time
+      - Always preserves the current hash (labels + model)
     """
     labels_dir = cache_dir / 'labels'
     models_dir = cache_dir / 'models'
@@ -111,88 +115,88 @@ def limpar_cache(cache_dir: Path, params_hash_atual: str,
     # --- Labels ---
     if labels_dir.exists():
         parquets = sorted(labels_dir.glob('*.parquet'), key=lambda f: f.stat().st_mtime)
-        # preservar o actual e os mais recentes
-        para_apagar = [f for f in parquets
-                       if params_hash_atual not in f.name][:-keep_labels]
-        for f in para_apagar:
+        # preserve current and most recent
+        to_delete = [f for f in parquets
+                       if current_params_hash not in f.name][:-keep_labels]
+        for f in to_delete:
             f.unlink(missing_ok=True)
-        if para_apagar:
-            console.print(f"  [dim]Cache: apagados {len(para_apagar)} labels antigos[/dim]")
+        if to_delete:
+            console.print(f"  [dim]Cache: deleted {len(to_delete)} old labels[/dim]")
 
-    # --- Modelos ---
+    # --- Models ---
     if models_dir.exists():
         model_dirs = sorted(
             [d for d in models_dir.iterdir() if d.is_dir()],
             key=lambda d: d.stat().st_mtime,
         )
-        para_apagar = [d for d in model_dirs
-                       if d.name != modelo_hash_atual][:-keep_models]
-        for d in para_apagar:
+        to_delete = [d for d in model_dirs
+                       if d.name != current_model_hash][:-keep_models]
+        for d in to_delete:
             import shutil as _shutil
             _shutil.rmtree(d, ignore_errors=True)
-        if para_apagar:
-            console.print(f"  [dim]Cache: apagados {len(para_apagar)} modelos antigos[/dim]")
+        if to_delete:
+            console.print(f"  [dim]Cache: deleted {len(to_delete)} old models[/dim]")
 
 
-def _guardar_melhor_modelo(cache_dir: Path, model_hash: str, iteracao: int,
-                           season: int, metricas: dict, params: dict):
-    """Copia o modelo aceite para best_models/season_N/ para não ser apagado pelo cleanup."""
+def _save_best_model(cache_dir: Path, model_hash: str, iteration: int,
+                     season: int, metrics: dict, params: dict):
+    """Copies the accepted model to best_models/season_N/ so it is not deleted by cleanup."""
     src = cache_dir / 'models' / model_hash
     if not src.exists():
         return
 
     base_dir = cache_dir.parent
-    dest = base_dir / 'best_models' / f'season_{season}' / f'iter_{iteracao:04d}'
+    dest = base_dir / 'best_models' / f'season_{season}' / f'iter_{iteration:04d}'
     dest.mkdir(parents=True, exist_ok=True)
 
     import shutil as _shutil
     _shutil.copytree(src, dest / 'model', dirs_exist_ok=True)
 
-    # Guardar metadados junto ao modelo
+    # Save metadata alongside the model
     import json as _json
     meta = {
-        'iteracao': iteracao,
+        'iteracao': iteration,
         'season': season,
         'model_hash': model_hash,
-        'metricas': metricas,
+        'metricas': metrics,
         'params': {k: list(v) if isinstance(v, (list, tuple)) else v for k, v in params.items()},
     }
     (dest / 'meta.json').write_text(_json.dumps(meta, indent=2, ensure_ascii=False))
-    console.print(f"  [dim]Modelo guardado em best_models/season_{season}/iter_{iteracao:04d}/[/dim]")
+    console.print(f"  [dim]Model saved to best_models/season_{season}/iter_{iteration:04d}/[/dim]")
 
 
-def _actualizar_program_md_top(program_path: Path, top_registos: list[dict]):
-    """Actualiza a secção TOP RESULTADOS no program.md após cada iteração."""
-    if not top_registos:
+def _update_program_md_top(program_path: Path, top_records: list[dict]):
+    """Updates the TOP RESULTS section in program.md after each iteration."""
+    if not top_records:
         return
 
-    linhas = ["## 📊 Melhores Resultados Actuais (auto-actualizado)\n\n"]
+    lines = ["## 📊 Melhores Resultados Actuais (auto-actualizado)\n\n"]
     sl_vals, tp_vals, thr_vals = [], [], []
     tfs_counter: dict = {}
 
-    for i, h in enumerate(top_registos):
-        m = h.get('metricas', {})
+    for i, h in enumerate(top_records):
+        metrics = h.get('metricas', {})
         ps = h.get('params_snapshot', {})
-        sl  = m.get('sl_pct')
-        tp  = m.get('tp_pct')
-        thr = m.get('threshold')
+        sl  = metrics.get('sl_pct')
+        tp  = metrics.get('tp_pct')
+        thr = metrics.get('threshold')
         tfs = ps.get('TIMEFRAMES', '?')
-        score = m.get('score_composto', 0)
-        sv    = m.get('sharpe_validation')
-        sh    = m.get('sharpe_holdout')
-        auc   = m.get('cv_auc_mean', 0)
+        score = metrics.get('score_composto', 0)
+        sv    = metrics.get('sharpe_validation')
+        sh    = metrics.get('sharpe_holdout')
+        auc   = metrics.get('cv_auc_mean', 0)
         if sv is not None:
             score_fmt = (f"AUC={_fmt_num(auc, 3)} | Sharpe(val)={_fmt_num(sv, 2)} | "
                          f"Sharpe(holdout)={_fmt_num(sh, 2)}" if sh is not None else f"AUC={_fmt_num(auc, 3)} | Sharpe(val)={_fmt_num(sv, 2)}")
         else:
             score_fmt = f"score={_fmt_num(score, 4)}"
-        linhas.append(
+        lines.append(
             f"**#{i+1} iter={h.get('iteracao','?')}** {score_fmt} | "
-            f"DD={_fmt_num(abs(m.get('max_drawdown_pct', 0)), 1)}% | Trades={m.get('n_trades', 0)} | "
-            f"WR={_fmt_num(m.get('win_rate_pct', 0), 1)}%  \n"
+            f"DD={_fmt_num(abs(metrics.get('max_drawdown_pct', 0)), 1)}% | Trades={metrics.get('n_trades', 0)} | "
+            f"WR={_fmt_num(metrics.get('win_rate_pct', 0), 1)}%  \n"
         )
         if isinstance(sl, (int, float)) and isinstance(tp, (int, float)) and isinstance(thr, (int, float)):
-            linhas.append(f"→ SL={_fmt_num(sl, 2)}% TP={_fmt_num(tp, 2)}% Thr={_fmt_num(thr, 3)} | TFs={tfs} | "
+            lines.append(f"→ SL={_fmt_num(sl, 2)}% TP={_fmt_num(tp, 2)}% Thr={_fmt_num(thr, 3)} | TFs={tfs} | "
                           f"Entry: stoch<{ps.get('ENTRY_STOCH_THRESHOLD','?')} adx>{ps.get('ENTRY_ADX_THRESHOLD','?')}  \n\n")
             sl_vals.append(sl); tp_vals.append(tp); thr_vals.append(thr)
         tfs_key = str(tfs)
@@ -200,7 +204,7 @@ def _actualizar_program_md_top(program_path: Path, top_registos: list[dict]):
 
     if sl_vals:
         tfs_dom = max(tfs_counter, key=tfs_counter.get)
-        linhas.append(
+        lines.append(
             f"**Padrão dominante:** SL={_fmt_num(sum(sl_vals)/len(sl_vals), 1)}% "
             f"(±{_fmt_num((max(sl_vals)-min(sl_vals))/2, 1)}) | "
             f"TP={_fmt_num(sum(tp_vals)/len(tp_vals), 1)}% (±{_fmt_num((max(tp_vals)-min(tp_vals))/2, 1)}) | "
@@ -208,46 +212,46 @@ def _actualizar_program_md_top(program_path: Path, top_registos: list[dict]):
             f"→ Explora variações de features e entry signal nesta zona. Não repitas params iguais.\n"
         )
 
-    secao = "\n---\n\n" + "".join(linhas) + "\n---\n"
+    section = "\n---\n\n" + "".join(lines) + "\n---\n"
 
-    # Substituir secção existente ou inserir no fim
-    texto = program_path.read_text() if program_path.exists() else ""
+    # Replace existing section or append at the end
+    text = program_path.read_text() if program_path.exists() else ""
     import re as _re
-    if "## 📊 Melhores Resultados Actuais" in texto:
-        texto = _re.sub(
+    if "## 📊 Melhores Resultados Actuais" in text:
+        text = _re.sub(
             r'\n---\n\n## 📊 Melhores Resultados Actuais.*?\n---\n',
-            secao, texto, flags=_re.DOTALL
+            section, text, flags=_re.DOTALL
         )
     else:
-        texto = texto.rstrip() + "\n" + secao
-    program_path.write_text(texto)
+        text = text.rstrip() + "\n" + section
+    program_path.write_text(text)
 
 
-def executar_loop(config: dict, max_iteracoes: int = 0,
-                  human_review_interval: int = 5,
-                  experiments_dir: Path = None,
-                  cache_dir: Path = None):
+def run_loop(config: dict, max_iterations: int = 0,
+             human_review_interval: int = 5,
+             experiments_dir: Path = None,
+             cache_dir: Path = None):
     """
-    Loop principal de pesquisa autónoma.
+    Main autonomous research loop.
 
     Args:
-        config: configuração do sistema
-        max_iteracoes: 0 = infinito
-        human_review_interval: pedir revisão a cada N iterações (0 = desactivado)
-        experiments_dir: onde guardar experiências
-        cache_dir: cache de labels e modelos
+        config: system configuration
+        max_iterations: 0 = infinite
+        human_review_interval: ask for review every N iterations (0 = disabled)
+        experiments_dir: where to save experiences
+        cache_dir: labels and models cache
     """
     import signal
 
-    _parar = False
+    _stop = False
 
     def _handler_sigint(sig, frame):
-        nonlocal _parar
-        if not _parar:
-            console.print("\n[bold yellow]Ctrl+C recebido — a terminar após a iteração atual...[/bold yellow]")
-            _parar = True
+        nonlocal _stop
+        if not _stop:
+            console.print("\n[bold yellow]Ctrl+C received — finishing after current iteration...[/bold yellow]")
+            _stop = True
         else:
-            console.print("\n[bold red]Ctrl+C forçado — a sair imediatamente.[/bold red]")
+            console.print("\n[bold red]Ctrl+C forced — exiting immediately.[/bold red]")
             raise SystemExit(1)
 
     signal.signal(signal.SIGINT, _handler_sigint)
@@ -263,37 +267,37 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
         cache_dir = base_dir / 'cache'
 
     tracker = Tracker(experiments_dir)
-    iteracao = tracker.proximo_numero_iteracao()
-    params_anteriores = None
+    iteration = tracker.next_iteration_number()
+    previous_params = None
 
-    # Carregar score do último aceite como baseline, ou usar baseline_override do config
+    # Load score from last accepted as baseline, or use baseline_override from config
     baseline_override  = config.get('agent', {}).get('baseline_override', 0.0)
     accept_auc_min          = config.get('agent', {}).get('accept_auc_min', 0.0)
     accept_sharpe_min       = config.get('agent', {}).get('accept_sharpe_min', 0.0)
     accept_sharpe_holdout_min = config.get('agent', {}).get('accept_sharpe_holdout_min', 0.0)
-    ultimo = tracker.ultimo_aceite()
-    if ultimo:
-        ultimo_mode = (ultimo.params_snapshot or {}).get('OBJECTIVE_MODE', 'score')
-        if ultimo_mode == 'profit':
-            score_baseline = ultimo.metricas.get('retorno_total_oos_pct', baseline_override)
+    last = tracker.last_accepted()
+    if last:
+        last_mode = (last.params_snapshot or {}).get('OBJECTIVE_MODE', 'score')
+        if last_mode == 'profit':
+            score_baseline = last.metricas.get('retorno_total_oos_pct', baseline_override)
         else:
-            sv = ultimo.metricas.get('sharpe_validation')
-            score_baseline = float(sv) if sv is not None else ultimo.metricas.get('score_composto', 0.0)
-        params_anteriores = ultimo.params_snapshot
-        console.print(f"[cyan]Retomando pesquisa. Última aceite: iter {ultimo.iteracao}, "
+            sv = last.metricas.get('sharpe_validation')
+            score_baseline = float(sv) if sv is not None else last.metricas.get('score_composto', 0.0)
+        previous_params = last.params_snapshot
+        console.print(f"[cyan]Resuming research. Last accepted: iter {last.iteracao}, "
                       f"score={_fmt_num(score_baseline, 4)}[/cyan]")
     else:
         score_baseline = baseline_override
         if baseline_override > 0:
-            console.print(f"[cyan]Nova temporada. Baseline mínimo definido: {_fmt_num(baseline_override, 4)}[/cyan]")
+            console.print(f"[cyan]New season. Minimum baseline set: {_fmt_num(baseline_override, 4)}[/cyan]")
         else:
             score_baseline = 0.0
 
     console.print(Panel(
-        f"[bold green]algo_autoresearch — Loop de Pesquisa[/bold green]\n"
-        f"Iteração inicial: {iteracao}\n"
+        f"[bold green]algo_autoresearch — Research Loop[/bold green]\n"
+        f"Initial iteration: {iteration}\n"
         f"Score baseline: {_fmt_num(score_baseline, 4)}\n"
-        f"Max iterações: {'∞' if max_iteracoes == 0 else max_iteracoes}",
+        f"Max iterations: {'∞' if max_iterations == 0 else max_iterations}",
         border_style="green",
     ))
 
@@ -304,259 +308,268 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
     t_base  = config.get('llm', {}).get('temperature', 0.7)
     t_min   = config.get('llm', {}).get('t_min', 0.3)
     t_max   = config.get('llm', {}).get('t_max', 1.2)
-    t_decay = config.get('llm', {}).get('t_decay', 0.92)   # quando melhora → exploit
-    t_grow  = config.get('llm', {}).get('t_grow', 1.08)    # quando estagna → explore
+    t_decay = config.get('llm', {}).get('t_decay', 0.92)   # when improving → exploit
+    t_grow  = config.get('llm', {}).get('t_grow', 1.08)    # when stagnating → explore
     stagnation_threshold = config.get('llm', {}).get('stagnation_threshold', 5)
-    temp_atual         = t_base
-    iters_sem_melhoria = 0
+    current_temp         = t_base
+    iters_without_improvement = 0
 
-    rejeicoes_recentes: list[str] = []  # últimas rejeições de validação
+    recent_rejections: list[str] = []  # latest validation rejections
 
     while True:
-        if _parar:
-            console.print("[bold yellow]Loop terminado por Ctrl+C.[/bold yellow]")
+        if _stop:
+            console.print("[bold yellow]Loop finished by Ctrl+C.[/bold yellow]")
             break
 
-        if max_iteracoes > 0 and iteracao > max_iteracoes:
-            console.print("[bold]Número máximo de iterações atingido.[/bold]")
+        if max_iterations > 0 and iteration > max_iterations:
+            console.print("[bold]Maximum number of iterations reached.[/bold]")
             break
 
-        console.print(f"\n[bold cyan]══ Iteração {iteracao} ══[/bold cyan]  "
-                      f"[dim]temp={_fmt_num(temp_atual, 2)} | sem_melhoria={iters_sem_melhoria}[/dim]")
+        console.print(f"\n[bold cyan]══ Iteration {iteration} ══[/bold cyan]  "
+                      f"[dim]temp={_fmt_num(current_temp, 2)} | no_improvement={iters_without_improvement}[/dim]")
 
-        # --- 1. Carregar params atuais ---
-        codigo_atual = params_path.read_text()
-        params_atuais = carregar_params(params_path)
+        # --- 1. Load current params ---
+        current_code = params_path.read_text()
+        current_params = carregar_params(params_path)
 
-        # --- 2. LLM propor novos params ---
-        console.print("  [dim]A consultar LLM...[/dim]")
+        # --- 2. LLM propose new params ---
+        console.print("  [dim]Querying LLM...[/dim]")
         program_md = program_path.read_text() if program_path.exists() else ""
-        historico  = tracker.listar_historico(30)
-        melhor     = tracker.melhor_score()
-        melhor_dict = melhor.to_dict() if melhor else None
+        history  = tracker.list_history(30)
+        best     = tracker.best_score()
+        best_dict = best.to_dict() if best else None
         top5        = tracker.top_n_scores(10)
 
-        codigo_proposto = propor_novos_params(
-            codigo_atual, program_md, historico, config,
-            melhor_registo=melhor_dict,
-            top_registos=top5,
-            rejeicoes_recentes=rejeicoes_recentes,
-            temperature=temp_atual,
+        proposed_code = propose_new_params(
+            current_code, program_md, history, config,
+            best_record=best_dict,
+            top_records=top5,
+            recent_rejections=recent_rejections,
+            temperature=current_temp,
         )
 
-        if codigo_proposto is None:
-            console.print("  [red]LLM não retornou código válido. A manter params atuais.[/red]")
-            # Correr com params atuais mesmo assim
-            codigo_proposto = codigo_atual
+        if proposed_code is None:
+            console.print("  [red]LLM did not return valid code. Keeping current params.[/red]")
+            # Run with current params anyway
+            proposed_code = current_code
 
-        # --- 3. Validar ---
-        ok, msg = validar_codigo(codigo_proposto)
+        # --- 3. Validate ---
+        ok, message = validate_code(proposed_code)
         if not ok:
-            console.print(f"  [red]Código rejeitado: {msg}[/red]")
-            rejeicoes_recentes.append(msg)
-            rejeicoes_recentes = rejeicoes_recentes[-5:]  # manter apenas últimas 5
-            registo = tracker.criar_registo(
-                iteracao=iteracao,
+            console.print(f"  [red]Code rejected: {message}[/red]")
+            recent_rejections.append(message)
+            recent_rejections = recent_rejections[-5:]  # keep only latest 5
+            record = tracker.create_record(
+                iteration=iteration,
                 status='rejeitado',
                 metricas={'score_composto': 0.0},
                 params_hash='invalid',
                 labels_reutilizados=False,
                 duracao=0.0,
-                alteracoes=f"REJEITADO: {msg}",
+                alteracoes=f"REJECTED: {message}",
             )
-            tracker.guardar_experiencia(registo)
-            iteracao += 1
+            tracker.save_experience(record)
+            iteration += 1
             continue
 
-        # Validação passou — limpar rejeições pendentes
-        rejeicoes_recentes.clear()
+        # Validation passed — clear pending rejections
+        recent_rejections.clear()
 
-        # Auto-corrigir N_TRIALS_XGB: forçar 0 salvo em modo exploit ou opção B
+        # Auto-correct N_TRIALS_XGB: force 0 unless in exploit mode or option B
         exploit_mode = "MODO EXPLOIT ATIVO" in program_md or "OPÇÃO B" in program_md
         if not exploit_mode:
             import re as _re
-            codigo_corrigido = _re.sub(
+            corrected_code = _re.sub(
                 r'(N_TRIALS_XGB\s*=\s*)\d+',
-                r'\g<1>0  # forçado a 0 pelo runner (modo exploração)',
-                codigo_proposto
+                r'\g<1>0  # forced to 0 by runner (exploration mode)',
+                proposed_code
             )
-            if codigo_corrigido != codigo_proposto:
-                console.print("  [dim]Auto-correcção: N_TRIALS_XGB → 0 (modo exploração)[/dim]")
-                codigo_proposto = codigo_corrigido
+            if corrected_code != proposed_code:
+                console.print("  [dim]Auto-correction: N_TRIALS_XGB → 0 (exploration mode)[/dim]")
+                proposed_code = corrected_code
 
-        # Mostrar o que o agente propõe
-        mostrar_params_propostos(codigo_atual, codigo_proposto)
+        # Show what the agent proposes
+        show_proposed_params(current_code, proposed_code)
 
-        # --- 4. Guardar backup e aplicar ---
+        # --- 4. Save backup and apply ---
         shutil.copy2(params_path, backup_path)
-        params_path.write_text(codigo_proposto)
+        params_path.write_text(proposed_code)
 
-        params_novos = carregar_params(params_path)
-        hash_novo = hash_params_completo(params_novos)
+        new_params = carregar_params(params_path)
+        new_hash = hash_params_completo(new_params)
 
-        # --- 4b. Early stopping: rejeitar configuração já explorada ---
-        if tracker.hash_ja_explorado(hash_novo):
-            console.print(f"  [yellow]✗ DUPLICADO: configuração já testada (hash={hash_novo[:8]}) — a saltar pipeline[/yellow]")
+        # --- 4b. Early stopping: reject already explored configuration ---
+        if tracker.hash_already_explored(new_hash):
+            console.print(f"  [yellow]✗ DUPLICATE: configuration already tested (hash={new_hash[:8]}) — skipping pipeline[/yellow]")
             if revert_on_worse:
                 shutil.copy2(backup_path, params_path)
-            msg_dup = f"Configuração duplicada (hash={hash_novo[:8]}) — propor variação diferente"
-            rejeicoes_recentes.append(msg_dup)
-            rejeicoes_recentes = rejeicoes_recentes[-5:]
-            iters_sem_melhoria += 1
-            if iters_sem_melhoria >= stagnation_threshold:
-                temp_anterior = temp_atual
-                temp_atual = min(t_max, temp_atual * t_grow)
-                console.print(f"  [dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (explore — stagnação)[/dim]")
-            registo = tracker.criar_registo(
-                iteracao=iteracao,
+            msg_dup = f"Duplicate configuration (hash={new_hash[:8]}) — propose a different variation"
+            recent_rejections.append(msg_dup)
+            recent_rejections = recent_rejections[-5:]
+            iters_without_improvement += 1
+            if iters_without_improvement >= stagnation_threshold:
+                previous_temp = current_temp
+                current_temp = min(t_max, current_temp * t_grow)
+                console.print(f"  [dim]temp {_fmt_num(previous_temp, 2)}→{_fmt_num(current_temp, 2)} (explore — stagnation)[/dim]")
+            record = tracker.create_record(
+                iteration=iteration,
                 status='rejeitado',
                 metricas={'score_composto': 0.0},
-                params_hash=hash_novo,
+                params_hash=new_hash,
                 labels_reutilizados=False,
                 duracao=0.0,
-                alteracoes=f"DUPLICADO: {hash_novo[:8]}",
+                alteracoes=f"DUPLICATE: {new_hash[:8]}",
             )
-            tracker.guardar_experiencia(registo)
-            iteracao += 1
+            tracker.save_experience(record)
+            iteration += 1
             continue
 
-        alteracoes = tracker.calcular_alteracoes(
-            params_anteriores or params_atuais,
-            params_novos
+        changes = tracker.compute_changes(
+            previous_params or current_params,
+            new_params
         )
-        console.print(f"  Alterações: [yellow]{alteracoes}[/yellow]")
+        console.print(f"  Changes: [yellow]{changes}[/yellow]")
 
-        # --- 5. Correr pipeline ---
-        t_inicio = time.time()
-        resultado = executar_pipeline(config, params_path, cache_dir)
-        duracao = time.time() - t_inicio
+        # --- 5. Run pipeline ---
+        start_time = time.time()
+        result = executar_pipeline(config, params_path, cache_dir)
+        duration = time.time() - start_time
 
-        # --- 6. Calcular score e decidir ---
-        objective_mode    = params_novos.get('OBJECTIVE_MODE', 'score')
-        auc_atual         = resultado.metricas.get('cv_auc_mean', 0.0) if resultado.sucesso else 0.0
-        sharpe_validation = resultado.metricas.get('sharpe_validation', 0.0) if resultado.sucesso else 0.0
-        sharpe_holdout_v  = resultado.metricas.get('sharpe_holdout', 0.0) if resultado.sucesso else 0.0
+        # --- 6. Calculate score and decide ---
+        objective_mode    = new_params.get('OBJECTIVE_MODE', 'score')
+        current_auc         = result.metricas.get('cv_auc_mean', 0.0) if result.sucesso else 0.0
+        sharpe_validation = result.metricas.get('sharpe_validation', 0.0) if result.sucesso else 0.0
+        sharpe_holdout_value  = result.metricas.get('sharpe_holdout', 0.0) if result.sucesso else 0.0
 
         if objective_mode == 'profit':
-            score_atual = resultado.metricas.get('retorno_total_oos_pct', -999.0) if resultado.sucesso else -999.0
-            melhorou = resultado.sucesso and (score_atual > score_baseline + accept_threshold)
+            current_score = result.metricas.get('retorno_total_oos_pct', -999.0) if result.sucesso else -999.0
+            improved = result.sucesso and (current_score > score_baseline + accept_threshold)
         else:
-            score_atual   = sharpe_validation
-            gate_auc      = auc_atual >= accept_auc_min
+            current_score   = sharpe_validation
+            gate_auc      = current_auc >= accept_auc_min
             gate_sharpe   = sharpe_validation >= accept_sharpe_min
-            gate_holdout  = sharpe_holdout_v >= accept_sharpe_holdout_min
-            melhorou      = resultado.sucesso and gate_auc and gate_sharpe and gate_holdout
+            gate_holdout  = sharpe_holdout_value >= accept_sharpe_holdout_min
+            improved      = result.sucesso and gate_auc and gate_sharpe and gate_holdout
 
-        # Detetar resultado Optuna já encontrado (mesmo ótimo local, params diferentes)
-        if resultado.sucesso and tracker.resultado_ja_encontrado(resultado.metricas):
-            sl  = resultado.metricas.get('sl_pct', '?')
-            tp  = resultado.metricas.get('tp_pct', '?')
-            thr = resultado.metricas.get('threshold', '?')
-            console.print(f"  [yellow]✗ RESULTADO DUPLICADO: Optuna convergiu para o mesmo ótimo "
-                          f"(SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)}) — escapar desta zona[/yellow]")
-            msg_res = f"Resultado duplicado: Optuna encontrou SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)} — mudar features ou TIMEFRAMES para escapar"
-            rejeicoes_recentes.append(msg_res)
-            rejeicoes_recentes = rejeicoes_recentes[-5:]
-            iters_sem_melhoria += 1
+        # Detect Optuna result already found (same local optimum, different params)
+        if result.sucesso and tracker.result_already_found(result.metricas):
+            sl  = result.metricas.get('sl_pct', '?')
+            tp  = result.metricas.get('tp_pct', '?')
+            thr = result.metricas.get('threshold', '?')
+            console.print(f"  [yellow]✗ DUPLICATE RESULT: Optuna converged to the same optimum "
+                          f"(SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)}) — escape this region[/yellow]")
+            msg_res = f"Duplicate result: Optuna found SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)} — change features or TIMEFRAMES to escape"
+            recent_rejections.append(msg_res)
+            recent_rejections = recent_rejections[-5:]
+            iters_without_improvement += 1
             if revert_on_worse:
                 shutil.copy2(backup_path, params_path)
-            registo = tracker.criar_registo(
-                iteracao=iteracao,
+            record = tracker.create_record(
+                iteration=iteration,
                 status='rejeitado',
-                metricas=resultado.metricas,
-                params_hash=hash_params_completo(params_novos),
-                labels_reutilizados=resultado.labels_reutilizados,
-                duracao=duracao,
-                alteracoes=f"RESULTADO DUPLICADO: SL={_fmt_num(sl)}% TP={_fmt_num(tp)}%",
-                params_snapshot=params_novos,
+                metricas=result.metricas,
+                params_hash=hash_params_completo(new_params),
+                labels_reutilizados=result.labels_reutilizados,
+                duracao=duration,
+                alteracoes=f"DUPLICATE RESULT: SL={_fmt_num(sl)}% TP={_fmt_num(tp)}%",
+                params_snapshot=new_params,
             )
-            tracker.guardar_experiencia(registo)
-            iteracao += 1
+            tracker.save_experience(record)
+            iteration += 1
             continue
 
-        mostrar_resultado_iteracao(iteracao, resultado, score_baseline)
+        show_iteration_result(iteration, result, score_baseline)
 
-        if resultado.sucesso and melhorou:
+        if result.sucesso and improved:
             status = 'aceite'
-            params_anteriores = params_novos
-            # Melhoria → reduzir temperatura (exploit zona boa)
-            temp_anterior = temp_atual
-            temp_atual = max(t_min, temp_atual * t_decay)
-            iters_sem_melhoria = 0
+            previous_params = new_params
+            # Improvement → lower temperature (exploit good region)
+            previous_temp = current_temp
+            current_temp = max(t_min, current_temp * t_decay)
+            iters_without_improvement = 0
             if objective_mode == 'profit':
-                console.print(f"  [bold green]✓ ACEITE (retorno {_fmt_num(score_baseline, 1, sign=True)}%)[/bold green]  "
-                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (decay)[/dim]")
+                console.print(f"  [bold green]✓ ACCEPTED (return {_fmt_num(score_baseline, 1, sign=True)}%)[/bold green]  "
+                              f"[dim]temp {_fmt_num(previous_temp, 2)}→{_fmt_num(current_temp, 2)} (decay)[/dim]")
             else:
-                console.print(f"  [bold green]✓ ACEITE | AUC={_fmt_num(auc_atual, 3)} | "
+                console.print(f"  [bold green]✓ ACCEPTED | AUC={_fmt_num(current_auc, 3)} | "
                               f"Sharpe(val)={_fmt_num(sharpe_validation, 2)} | "
-                              f"Sharpe(holdout/passivo)={_fmt_num(sharpe_holdout_v, 2)}[/bold green]  "
-                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (decay)[/dim]")
-            # Preservar modelo aceite de limpeza pelo cleanup
+                              f"Sharpe(holdout/passive)={_fmt_num(sharpe_holdout_value, 2)}[/bold green]  "
+                              f"[dim]temp {_fmt_num(previous_temp, 2)}→{_fmt_num(current_temp, 2)} (decay)[/dim]")
+            # Preserve accepted model from cleanup
             season = config.get('agent', {}).get('season', 0)
-            _guardar_melhor_modelo(cache_dir, hash_novo, iteracao, season,
-                                   resultado.metricas, params_novos)
+            _save_best_model(cache_dir, new_hash, iteration, season,
+                             result.metricas, new_params)
         else:
-            status = 'rejeitado' if resultado.sucesso else 'erro'
+            status = 'rejeitado' if result.sucesso else 'erro'
             if objective_mode == 'profit':
-                razao = (f"retorno {_fmt_num(score_atual, 1, sign=True)}% ≤ baseline {_fmt_num(score_baseline, 1, sign=True)}% + {accept_threshold}%"
-                         if resultado.sucesso else resultado.erro)
+                reason = (f"return {_fmt_num(current_score, 1, sign=True)}% ≤ baseline {_fmt_num(score_baseline, 1, sign=True)}% + {accept_threshold}%"
+                         if result.sucesso else result.erro)
             else:
-                if resultado.sucesso:
-                    razao = (f"AUC={_fmt_num(auc_atual, 3)}(≥{accept_auc_min}) | "
+                if result.sucesso:
+                    reason = (f"AUC={_fmt_num(current_auc, 3)}(≥{accept_auc_min}) | "
                              f"Sharpe(val)={_fmt_num(sharpe_validation, 2)}(≥{accept_sharpe_min}) | "
-                             f"Sharpe(holdout)={_fmt_num(sharpe_holdout_v, 2)}(≥{accept_sharpe_holdout_min})")
+                             f"Sharpe(holdout)={_fmt_num(sharpe_holdout_value, 2)}(≥{accept_sharpe_holdout_min})")
                 else:
-                    razao = resultado.erro
-            # Sem melhoria → contar; se ultrapassar threshold, aumentar temperatura (explore)
-            iters_sem_melhoria += 1
-            if iters_sem_melhoria >= stagnation_threshold:
-                temp_anterior = temp_atual
-                temp_atual = min(t_max, temp_atual * t_grow)
-                console.print(f"  [yellow]✗ REVERTIDO ({razao})[/yellow]  "
-                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (explore)[/dim]")
+                    reason = result.erro
+            # No improvement → count; if threshold exceeded, increase temperature (explore)
+            iters_without_improvement += 1
+            if iters_without_improvement >= stagnation_threshold:
+                previous_temp = current_temp
+                current_temp = min(t_max, current_temp * t_grow)
+                console.print(f"  [yellow]✗ REVERTED ({reason})[/yellow]  "
+                              f"[dim]temp {_fmt_num(previous_temp, 2)}→{_fmt_num(current_temp, 2)} (explore)[/dim]")
             else:
-                console.print(f"  [yellow]✗ REVERTIDO ({razao})[/yellow]  "
-                              f"[dim]{iters_sem_melhoria}/{stagnation_threshold} sem melhoria[/dim]")
+                console.print(f"  [yellow]✗ REVERTED ({reason})[/yellow]  "
+                              f"[dim]{iters_without_improvement}/{stagnation_threshold} without improvement[/dim]")
             if revert_on_worse:
                 shutil.copy2(backup_path, params_path)
 
-        # --- 7. Limpar cache a cada 10 iterações ---
-        if iteracao % 10 == 0:
+        # --- 7. Clean cache every 10 iterations ---
+        if iteration % 10 == 0:
             _train_start = config['pipeline'].get('train_start', 2017)
             _train_end   = config['pipeline'].get('train_end', 2024)
-            limpar_cache(
+            clean_cache(
                 cache_dir,
-                params_hash_atual=hash_entry_params(params_novos, train_start=_train_start, train_end=_train_end),
-                modelo_hash_atual=hash_params_completo(params_novos),
+                current_params_hash=hash_entry_params(new_params, train_start=_train_start, train_end=_train_end),
+                current_model_hash=hash_params_completo(new_params),
             )
 
-        # --- 8. Registar ---
-        registo = tracker.criar_registo(
-            iteracao=iteracao,
+        # --- 8. Register ---
+        record = tracker.create_record(
+            iteration=iteration,
             status=status,
-            metricas=resultado.metricas if resultado.sucesso else {'score_composto': score_atual},
-            params_hash=hash_params_completo(params_novos),
-            labels_reutilizados=resultado.labels_reutilizados,
-            duracao=duracao,
-            alteracoes=alteracoes,
-            params_snapshot=params_novos,
+            metricas=result.metricas if result.sucesso else {'score_composto': current_score},
+            params_hash=hash_params_completo(new_params),
+            labels_reutilizados=result.labels_reutilizados,
+            duracao=duration,
+            alteracoes=changes,
+            params_snapshot=new_params,
         )
-        tracker.guardar_experiencia(registo)
+        tracker.save_experience(record)
 
-        # --- 8c. Libertar memória acumulada (mitigação OOM S7) ---
+        # --- 8c. Release accumulated memory (OOM mitigation S7) ---
         gc.collect()
 
-        # --- 8b. Actualizar program.md com top resultados (relido em cada iteração) ---
-        _actualizar_program_md_top(program_path, tracker.top_n_scores(10))
+        # --- 8b. Update program.md with top results (re-read each iteration) ---
+        _update_program_md_top(program_path, tracker.top_n_scores(10))
 
-        # --- 9. Revisão humana periódica ---
-        if human_review_interval > 0 and iteracao % human_review_interval == 0:
-            acao = solicitar_revisao_humana(tracker, params_path, iteracao, config)
-            if acao.get('acao') == 'sair':
-                console.print("[bold]A terminar por pedido do utilizador.[/bold]")
+        # --- 9. Periodic human review ---
+        if human_review_interval > 0 and iteration % human_review_interval == 0:
+            action = request_human_review(tracker, params_path, iteration, config)
+            if action.get('action') == 'exit':
+                console.print("[bold]Exiting by user request.[/bold]")
                 break
-            elif acao.get('acao') == 'injetar':
-                # Usar params injetados manualmente
-                console.print("  [cyan]Usando params injetados manualmente.[/cyan]")
+            elif action.get('action') == 'inject':
+                # Use manually injected params
+                console.print("  [cyan]Using manually injected params.[/cyan]")
 
-        iteracao += 1
+        iteration += 1
+
+
+# Backward-compatible wrapper used by main.py (keeps Portuguese parameter names)
+def executar_loop(config: dict, max_iteracoes: int = 0,
+                  human_review_interval: int = 5,
+                  experiments_dir: Path = None,
+                  cache_dir: Path = None):
+    """Backward-compatible wrapper for run_loop."""
+    return run_loop(config, max_iteracoes, human_review_interval, experiments_dir, cache_dir)

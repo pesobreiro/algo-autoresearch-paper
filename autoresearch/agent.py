@@ -1,10 +1,10 @@
 """
-Agente LLM — propõe modificações ao research_params.py.
+LLM Agent — proposes modifications to research_params.py.
 
-Usa Qwen2.5-7B via llama.cpp (API OpenAI-compatível em localhost:8080).
-Valida código proposto: sintaxe Python + indicadores relativos (AST).
+Uses Qwen2.5-7B via llama.cpp (OpenAI-compatible API at localhost:8080).
+Validates proposed code: Python syntax + relative indicators (AST).
 
-Regra crítica: NUNCA aceitar código com df['Close'], df['Open'], etc.
+Critical rule: NEVER accept code with df['Close'], df['Open'], etc.
 """
 import ast
 import re
@@ -14,100 +14,100 @@ from pathlib import Path
 from typing import Optional
 
 
-# Colunas de preço absoluto proibidas
+# Forbidden absolute price columns
 PRICE_COLUMNS = {'Close', 'Open', 'High', 'Low', 'Volume',
                  'close', 'open', 'high', 'low', 'volume'}
 
-SYSTEM_PROMPT = """És um Engenheiro de Machine Learning especializado em Trading Quantitativo.
-A tua tarefa é modificar o ficheiro research_params.py para maximizar o score_composto
-via Otimização Bayesiana (Optuna TPE Sampler já implementado no backtest).
+SYSTEM_PROMPT = """You are a Machine Learning Engineer specialized in Quantitative Trading.
+Your task is to modify the research_params.py file to maximize composite_score
+via Bayesian Optimization (Optuna TPE Sampler already implemented in the backtest).
 
-RESPONSABILIDADES:
-1. SELEÇÃO DE FEATURES: Escolhe entre 8-15 features do catálogo que façam sentido para o
-   regime de mercado (ex: alta volatilidade → ATR + BB Width; tendência → EMA diff + MACD)
-2. DEFINIÇÃO DE BOUNDS (intervalos): Define SL_RANGE, TP_RANGE, THRESHOLD_RANGE como tuplos
-   (min, max). A Optuna explora este espaço automaticamente — não precisas de valores exatos.
-3. AJUSTE DE REGULARIZAÇÃO XGBoost: Se o histórico mostrar degradação inter-anual ou
-   scores inconsistentes, aumenta REG_ALPHA e REG_LAMBDA para reduzir overfitting.
+RESPONSIBILITIES:
+1. FEATURE SELECTION: Choose 8-15 features from the catalog that make sense for the
+   market regime (e.g., high volatility → ATR + BB Width; trend → EMA diff + MACD)
+2. BOUND DEFINITION: Define SL_RANGE, TP_RANGE, THRESHOLD_RANGE as tuples
+   (min, max). Optuna explores this space automatically — you do not need exact values.
+3. XGBoost REGULARIZATION: If the history shows inter-year degradation or
+   inconsistent scores, increase REG_ALPHA and REG_LAMBDA to reduce overfitting.
 
-REGRAS ABSOLUTAS (nunca violar):
-1. APENAS indicadores relativos — NUNCA usar df['Close'], df['Open'], df['High'], df['Low']
-2. Usar apenas features do catálogo permitido (lista abaixo)
-3. O ficheiro deve ser Python válido e sintaticamente correto
-4. SL_RANGE, TP_RANGE, THRESHOLD_RANGE são TUPLOS (min, max) — não listas nem valores únicos
-5. TP_RANGE[0] deve ser sempre maior que SL_RANGE[0] (TP mínimo > SL mínimo)
+ABSOLUTE RULES (never violate):
+1. ONLY relative indicators — NEVER use df['Close'], df['Open'], df['High'], df['Low']
+2. Use only allowed features from the catalog (list below)
+3. The file must be valid and syntactically correct Python
+4. SL_RANGE, TP_RANGE, THRESHOLD_RANGE are TUPLES (min, max) — not lists or single values
+5. TP_RANGE[0] must always be greater than SL_RANGE[0] (min TP > min SL)
 
-Features permitidas — LISTA EXAUSTIVA (não inventar outras):
+Allowed features — EXHAUSTIVE LIST (do not invent others):
   stoch_rsi_k, stoch_rsi_d, rsi, bb_position, adx,
   ema_diff, trend, returns_1, atr_pct, bb_width_pct,
   macd_pct, macd_signal_pct, macd_hist_pct,
   volume_norm, returns_5,
   dist_sma200_pct, btc_trend, atr_regime
 
-Notas sobre features macro (requerem "1d" em TIMEFRAMES):
-  dist_sma200_pct — distância à SMA200 normalizada (%, apenas 1d); positivo = acima da SMA200
-  btc_trend       — BTC acima/abaixo da EMA50 (0=baixa, 1=alta, apenas 1d); cross-asset
-  atr_regime      — ATR / rolling_mean(ATR,50) por timeframe; >1 = volatilidade acima da média
+Notes on macro features (require "1d" in TIMEFRAMES):
+  dist_sma200_pct — normalized distance to SMA200 (%, 1d only); positive = above SMA200
+  btc_trend       — BTC above/below EMA50 (0=down, 1=up, 1d only); cross-asset
+  atr_regime      — ATR / rolling_mean(ATR,50) per timeframe; >1 = volatility above average
 
-PROIBIDO usar qualquer nome fora desta lista (ex: macd_diff, macd_signal, ema_ratio, etc.).
-Qualquer feature não listada acima causará erro e rejeição imediata do código.
+FORBIDDEN to use any name outside this list (e.g., macd_diff, macd_signal, ema_ratio, etc.).
+Any feature not listed above will cause an error and immediate rejection of the code.
 
-Timeframes: ["15m", "4h", "1d"] (qualquer subconjunto não-vazio)
+Timeframes: ["15m", "4h", "1d"] (any non-empty subset)
 
-Score composto (a MAXIMIZAR):
+Composite score (to MAXIMIZE):
   score = tanh(S/2)*0.50 + tanh(R/100)*0.30 - abs(DD)/100*0.20
-  onde S=Sharpe(365d), R=retorno anual%, DD=max drawdown%
+  where S=Sharpe(365d), R=annual return%, DD=max drawdown%
 
-ESTRATÉGIA DE AJUSTE DE BOUNDS:
-- Se a Optuna encontrou o melhor SL perto do limite INFERIOR → reduce SL_RANGE[0]
-- Se a Optuna encontrou o melhor SL perto do limite SUPERIOR → aumenta SL_RANGE[1]
-- Mesma lógica para TP_RANGE e THRESHOLD_RANGE
-- Bounds mais estreitos em torno da região boa aceleram convergência
+BOUND ADJUSTMENT STRATEGY:
+- If Optuna found the best SL near the LOWER bound → reduce SL_RANGE[0]
+- If Optuna found the best SL near the UPPER bound → increase SL_RANGE[1]
+- Same logic for TP_RANGE and THRESHOLD_RANGE
+- Tighter bounds around the good region speed up convergence
 
-OTIMIZAÇÃO XGBOOST COM OPTUNA:
-- Por defeito MANTER N_TRIALS_XGB = 0 (desativado) — prioridade é velocidade e exploração
-- Só ativar se o program.md indicar explicitamente modo EXPLOIT com xgb_trials > 0
+XGBoost OPTIMIZATION WITH OPTUNA:
+- By default KEEP N_TRIALS_XGB = 0 (disabled) — priority is speed and exploration
+- Only enable if program.md explicitly indicates EXPLOIT mode with xgb_trials > 0
 
-FORMATO OBRIGATÓRIO: o ficheiro deve conter APENAS atribuições de variáveis e comentários.
-PROIBIDO: FEATURES.remove(...), FEATURES.append(...), ou qualquer mutação de lista.
-Se quiseres remover uma feature, redefine FEATURES como uma nova lista completa.
+MANDATORY FORMAT: the file must contain ONLY variable assignments and comments.
+FORBIDDEN: FEATURES.remove(...), FEATURES.append(...), or any list mutation.
+If you want to remove a feature, redefine FEATURES as a complete new list.
 
-Responde APENAS com o conteúdo completo do ficheiro research_params.py.
-NÃO incluir explicações fora do ficheiro. Usa comentários Python dentro do ficheiro.
+Reply ONLY with the complete content of the research_params.py file.
+DO NOT include explanations outside the file. Use Python comments inside the file.
 """
 
 
-def _validar_sintaxe(codigo: str) -> tuple[bool, str]:
-    """Valida que o código é Python sintaticamente válido."""
+def _validate_syntax(code: str) -> tuple[bool, str]:
+    """Validates that the code is syntactically valid Python."""
     try:
-        ast.parse(codigo)
+        ast.parse(code)
         return True, "OK"
     except SyntaxError as e:
-        return False, f"Erro de sintaxe na linha {e.lineno}: {e.msg}"
+        return False, f"Syntax error on line {e.lineno}: {e.msg}"
 
 
-def _validar_indicadores_relativos(codigo: str) -> tuple[bool, str]:
+def _validate_relative_indicators(code: str) -> tuple[bool, str]:
     """
-    Valida via AST que o código não acede a colunas de preço absoluto.
+    Validates via AST that the code does not access absolute price columns.
 
-    Rejeita padrões como: df['Close'], df["open"], data['High'], etc.
+    Rejects patterns like: df['Close'], df["open"], data['High'], etc.
     """
     try:
-        tree = ast.parse(codigo)
+        tree = ast.parse(code)
     except SyntaxError:
-        return False, "Código inválido (erro de sintaxe)"
+        return False, "Invalid code (syntax error)"
 
     class PriceColumnVisitor(ast.NodeVisitor):
         def __init__(self):
             self.violations = []
 
         def visit_Subscript(self, node):
-            # Detecta padrões: algo['Close'] ou algo["open"]
+            # Detect patterns: something['Close'] or something["open"]
             if isinstance(node.slice, ast.Constant):
                 val = node.slice.value
                 if isinstance(val, str) and val in PRICE_COLUMNS:
                     self.violations.append(
-                        f"Acesso proibido a coluna de preço: '{val}' (linha {node.lineno})"
+                        f"Forbidden price column access: '{val}' (line {node.lineno})"
                     )
             self.generic_visit(node)
 
@@ -119,45 +119,45 @@ def _validar_indicadores_relativos(codigo: str) -> tuple[bool, str]:
     return True, "OK"
 
 
-def _validar_params_obrigatorios(codigo: str) -> tuple[bool, str]:
-    """Verifica que os parâmetros obrigatórios estão definidos."""
-    obrigatorios = [
+def _validate_required_params(code: str) -> tuple[bool, str]:
+    """Checks that required parameters are defined."""
+    required = [
         'FEATURES', 'TIMEFRAMES', 'ENTRY_STOCH_THRESHOLD', 'ENTRY_ADX_THRESHOLD',
         'N_ESTIMATORS', 'MAX_DEPTH', 'LEARNING_RATE', 'SL_RANGE', 'TP_RANGE',
         'THRESHOLD_RANGE', 'N_TRIALS', 'OBJECTIVE_MODE',
     ]
-    em_falta = [p for p in obrigatorios if p not in codigo]
-    if em_falta:
-        return False, f"Parâmetros obrigatórios em falta: {em_falta}"
+    missing = [p for p in required if p not in code]
+    if missing:
+        return False, f"Missing required parameters: {missing}"
     return True, "OK"
 
 
-def _validar_execucao(codigo: str) -> tuple[bool, str]:
-    """Executa o código num namespace isolado para detectar qualquer erro de runtime."""
+def _validate_execution(code: str) -> tuple[bool, str]:
+    """Runs the code in an isolated namespace to detect any runtime errors."""
     try:
-        exec(compile(codigo, '<research_params>', 'exec'), {})
+        exec(compile(code, '<research_params>', 'exec'), {})
         return True, "OK"
     except Exception as e:
-        return False, f"Erro de execução ({type(e).__name__}): {e}"
+        return False, f"Execution error ({type(e).__name__}): {e}"
 
 
-def _validar_sem_mutacoes(codigo: str) -> tuple[bool, str]:
-    """Rejeita código que muta FEATURES ou TIMEFRAMES após definição (ex: FEATURES.remove(...))."""
-    proibidos = ['FEATURES.remove(', 'FEATURES.append(', 'FEATURES.pop(',
+def _validate_no_mutations(code: str) -> tuple[bool, str]:
+    """Rejects code that mutates FEATURES or TIMEFRAMES after definition (e.g., FEATURES.remove(...))."""
+    forbidden = ['FEATURES.remove(', 'FEATURES.append(', 'FEATURES.pop(',
                  'FEATURES.extend(', 'FEATURES.insert(', 'FEATURES.clear(',
                  'TIMEFRAMES.remove(', 'TIMEFRAMES.append(']
-    for p in proibidos:
-        if p in codigo:
-            return False, (f"'{p}' não é permitido — define FEATURES como lista completa "
-                           f"em vez de mutar após definição")
+    for f in forbidden:
+        if f in code:
+            return False, (f"'{f}' is not allowed — define FEATURES as a complete list "
+                           f"instead of mutating after definition")
     return True, "OK"
 
 
-def _validar_features_catalogo(codigo: str) -> tuple[bool, str]:
-    """Extrai FEATURES do código via AST e valida contra o catálogo."""
+def _validate_catalog_features(code: str) -> tuple[bool, str]:
+    """Extracts FEATURES from code via AST and validates against the catalog."""
     try:
         from pipeline.features_catalog import validate_features
-        tree = ast.parse(codigo)
+        tree = ast.parse(code)
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -169,62 +169,62 @@ def _validar_features_catalogo(codigo: str) -> tuple[bool, str]:
                             ]
                             ok, msg = validate_features(features)
                             if not ok:
-                                return False, f"Feature inválida em FEATURES: {msg}"
+                                return False, f"Invalid feature in FEATURES: {msg}"
         return True, "OK"
     except Exception as e:
-        return True, "OK"  # não bloquear por erro de parsing secundário
+        return True, "OK"  # do not block because of secondary parsing error
 
 
-def extrair_codigo(resposta: str) -> Optional[str]:
+def extract_code(response: str) -> Optional[str]:
     """
-    Extrai o código Python da resposta do LLM.
+    Extracts Python code from the LLM response.
 
-    Tenta primeiro blocos ```python...```, depois todo o conteúdo.
+    Tries code blocks ```python...``` first, then the whole content.
     """
-    # Tentar extrair bloco de código
-    padroes = [
+    # Try to extract code block
+    patterns = [
         r'```python\n(.*?)```',
         r'```\n(.*?)```',
         r'```(.*?)```',
     ]
-    for padrao in padroes:
-        match = re.search(padrao, resposta, re.DOTALL)
+    for pattern in patterns:
+        match = re.search(pattern, response, re.DOTALL)
         if match:
             return match.group(1).strip()
 
-    # Se não há marcadores de código, assumir que a resposta é o código
-    linhas = resposta.strip().split('\n')
-    # Remover linhas que claramente não são código
-    codigo_linhas = []
-    for linha in linhas:
-        if linha.startswith('#') or '=' in linha or linha.strip() == '' or linha.startswith('[') or linha.startswith('"') or linha.startswith("'"):
-            codigo_linhas.append(linha)
-        elif any(kw in linha for kw in ['FEATURES', 'TIMEFRAMES', 'STOCH', 'ADX', 'EMA', 'SL_RANGE', 'TP_RANGE', 'THRESHOLD_RANGE', 'N_TRIALS', 'N_ESTIMATORS']):
-            codigo_linhas.append(linha)
+    # If no code markers, assume the response is the code
+    lines = response.strip().split('\n')
+    # Remove lines that are clearly not code
+    code_lines = []
+    for line in lines:
+        if line.startswith('#') or '=' in line or line.strip() == '' or line.startswith('[') or line.startswith('"') or line.startswith("'"):
+            code_lines.append(line)
+        elif any(kw in line for kw in ['FEATURES', 'TIMEFRAMES', 'STOCH', 'ADX', 'EMA', 'SL_RANGE', 'TP_RANGE', 'THRESHOLD_RANGE', 'N_TRIALS', 'N_ESTIMATORS']):
+            code_lines.append(line)
 
-    if len(codigo_linhas) > 5:
-        return '\n'.join(codigo_linhas)
+    if len(code_lines) > 5:
+        return '\n'.join(code_lines)
 
     return None
 
 
-def propor_novos_params(params_code: str, program_md: str,
-                        historico: list, config: dict,
-                        melhor_registo: dict = None,
-                        top_registos: list = None,
-                        rejeicoes_recentes: list = None,
-                        temperature: float = None) -> Optional[str]:
+def propose_new_params(params_code: str, program_md: str,
+                       history: list, config: dict,
+                       best_record: dict = None,
+                       top_records: list = None,
+                       recent_rejections: list = None,
+                       temperature: float = None) -> Optional[str]:
     """
-    Chama o LLM para propor um novo research_params.py.
+    Calls the LLM to propose a new research_params.py.
 
     Args:
-        params_code: conteúdo atual do research_params.py
-        program_md: conteúdo do program.md (direção da pesquisa)
-        historico: lista de dicts com resultados anteriores
-        config: configuração do sistema
+        params_code: current content of research_params.py
+        program_md: content of program.md (research direction)
+        history: list of dicts with previous results
+        config: system configuration
 
     Returns:
-        Novo conteúdo do research_params.py, ou None se falhar
+        New content of research_params.py, or None if it fails
     """
     server_url = config.get('llm', {}).get('server_url', 'http://localhost:8080')
     max_tokens = config.get('llm', {}).get('max_tokens', 2048)
@@ -232,153 +232,153 @@ def propor_novos_params(params_code: str, program_md: str,
         temperature = config.get('llm', {}).get('temperature', 0.7)
     timeout    = config.get('llm', {}).get('timeout_seconds', 120)
 
-    # Melhor resultado até agora
-    melhor_texto = ""
-    if melhor_registo:
-        m = melhor_registo.get('metricas', {})
-        ps = melhor_registo.get('params_snapshot', {})
+    # Best result so far
+    best_text = ""
+    if best_record:
+        metrics = best_record.get('metricas', {})
+        params_snapshot = best_record.get('params_snapshot', {})
 
-        # Sensibilidade Optuna: onde o melhor SL/TP/threshold ficou em relação aos bounds
+        # Optuna sensitivity: where the best SL/TP/threshold landed relative to bounds
         sensitivity = ""
-        sl_best = m.get('sl_pct')
-        tp_best = m.get('tp_pct')
-        thr_best = m.get('threshold')
-        sl_range = ps.get('SL_RANGE', (0.5, 12.0))
-        tp_range = ps.get('TP_RANGE', (1.0, 40.0))
-        thr_range = ps.get('THRESHOLD_RANGE', (0.30, 0.80))
+        sl_best = metrics.get('sl_pct')
+        tp_best = metrics.get('tp_pct')
+        thr_best = metrics.get('threshold')
+        sl_range = params_snapshot.get('SL_RANGE', (0.5, 12.0))
+        tp_range = params_snapshot.get('TP_RANGE', (1.0, 40.0))
+        thr_range = params_snapshot.get('THRESHOLD_RANGE', (0.30, 0.80))
 
         if sl_best is not None and sl_range:
             sl_lo, sl_hi = sl_range
             sl_rel = (sl_best - sl_lo) / max(sl_hi - sl_lo, 1e-6)
             if sl_rel < 0.2:
-                sensitivity += f"    SL ótimo={sl_best:.2f}% perto do LIMITE INFERIOR ({sl_lo}) → considera reduzir SL_RANGE[0]\n"
+                sensitivity += f"    Optimal SL={sl_best:.2f}% near LOWER BOUND ({sl_lo}) → consider reducing SL_RANGE[0]\n"
             elif sl_rel > 0.8:
-                sensitivity += f"    SL ótimo={sl_best:.2f}% perto do LIMITE SUPERIOR ({sl_hi}) → considera aumentar SL_RANGE[1]\n"
+                sensitivity += f"    Optimal SL={sl_best:.2f}% near UPPER BOUND ({sl_hi}) → consider increasing SL_RANGE[1]\n"
             else:
-                sensitivity += f"    SL ótimo={sl_best:.2f}% no centro do intervalo [{sl_lo},{sl_hi}] → bounds adequados\n"
+                sensitivity += f"    Optimal SL={sl_best:.2f}% in the center of [{sl_lo},{sl_hi}] → bounds adequate\n"
 
         if tp_best is not None and tp_range:
             tp_lo, tp_hi = tp_range
             tp_rel = (tp_best - tp_lo) / max(tp_hi - tp_lo, 1e-6)
             if tp_rel < 0.2:
-                sensitivity += f"    TP ótimo={tp_best:.2f}% perto do LIMITE INFERIOR ({tp_lo}) → considera reduzir TP_RANGE[0]\n"
+                sensitivity += f"    Optimal TP={tp_best:.2f}% near LOWER BOUND ({tp_lo}) → consider reducing TP_RANGE[0]\n"
             elif tp_rel > 0.8:
-                sensitivity += f"    TP ótimo={tp_best:.2f}% perto do LIMITE SUPERIOR ({tp_hi}) → considera aumentar TP_RANGE[1]\n"
+                sensitivity += f"    Optimal TP={tp_best:.2f}% near UPPER BOUND ({tp_hi}) → consider increasing TP_RANGE[1]\n"
             else:
-                sensitivity += f"    TP ótimo={tp_best:.2f}% no centro do intervalo [{tp_lo},{tp_hi}] → bounds adequados\n"
+                sensitivity += f"    Optimal TP={tp_best:.2f}% in the center of [{tp_lo},{tp_hi}] → bounds adequate\n"
 
         if thr_best is not None and thr_range:
             thr_lo, thr_hi = thr_range
             thr_rel = (thr_best - thr_lo) / max(thr_hi - thr_lo, 1e-6)
             if thr_rel < 0.2:
-                sensitivity += f"    Threshold ótimo={thr_best:.3f} perto do LIMITE INFERIOR ({thr_lo}) → considera reduzir THRESHOLD_RANGE[0]\n"
+                sensitivity += f"    Optimal Threshold={thr_best:.3f} near LOWER BOUND ({thr_lo}) → consider reducing THRESHOLD_RANGE[0]\n"
             elif thr_rel > 0.8:
-                sensitivity += f"    Threshold ótimo={thr_best:.3f} perto do LIMITE SUPERIOR ({thr_hi}) → considera aumentar THRESHOLD_RANGE[1]\n"
+                sensitivity += f"    Optimal Threshold={thr_best:.3f} near UPPER BOUND ({thr_hi}) → consider increasing THRESHOLD_RANGE[1]\n"
             else:
-                sensitivity += f"    Threshold ótimo={thr_best:.3f} no centro do intervalo [{thr_lo},{thr_hi}] → bounds adequados\n"
+                sensitivity += f"    Optimal Threshold={thr_best:.3f} in the center of [{thr_lo},{thr_hi}] → bounds adequate\n"
 
-        # Análise forense do drawdown
-        df_info = m.get('drawdown_forensics', {})
-        forensic_txt = ""
+        # Max Drawdown forensic analysis
+        df_info = metrics.get('drawdown_forensics', {})
+        forensic_text = ""
         if df_info:
-            forensic_txt = (
-                f"  Análise forense do Max Drawdown ({df_info.get('ano','?')}):\n"
-                f"    Duração: {df_info.get('dur_dias','?')} dias | "
-                f"Profundidade: {df_info.get('profundidade','?'):.1f}%\n"
-                f"    Regime de mercado: {df_info.get('regime','?')}\n"
-                f"    ADX médio no período: {df_info.get('adx_medio','?')} (mín: {df_info.get('adx_minimo','?')})\n"
+            forensic_text = (
+                f"  Max Drawdown forensic analysis ({df_info.get('ano','?')}):\n"
+                f"    Duration: {df_info.get('dur_dias','?')} days | "
+                f"Depth: {df_info.get('profundidade','?'):.1f}%\n"
+                f"    Market regime: {df_info.get('regime','?')}\n"
+                f"    Average ADX in the period: {df_info.get('adx_medio','?')} (min: {df_info.get('adx_minimo','?')}))\n"
             )
-            # Sugestão automática baseada no regime
-            adx_m = df_info.get('adx_medio', 30)
-            if adx_m < 20:
-                forensic_txt += "    → Sugestão: aumentar ENTRY_ADX_THRESHOLD ou ADX_PERIOD para filtrar regimes sem tendência\n"
-            elif adx_m < 25:
-                forensic_txt += "    → Sugestão: considerar reduzir SL_RANGE (SL mais apertado em tendências fracas)\n"
+            # Automatic suggestion based on regime
+            adx_mean = df_info.get('adx_medio', 30)
+            if adx_mean < 20:
+                forensic_text += "    → Suggestion: increase ENTRY_ADX_THRESHOLD or ADX_PERIOD to filter trendless regimes\n"
+            elif adx_mean < 25:
+                forensic_text += "    → Suggestion: consider reducing SL_RANGE (tighter SL in weak trends)\n"
 
-        # Optuna parameter importance do melhor resultado
-        optuna_imp = m.get('optuna_param_importance', {})
-        optuna_imp_txt = ""
-        if optuna_imp:
-            sorted_oi = sorted(optuna_imp.items(), key=lambda x: -x[1])
-            dominant = sorted_oi[0][0] if sorted_oi else None
-            optuna_imp_txt = "  Optuna param importance (qual dimensão mais afeta o score):\n"
-            optuna_imp_txt += "    " + " | ".join(f"{k}={v:.3f}" for k,v in sorted_oi) + "\n"
+        # Optuna parameter importance of the best result
+        optuna_importance = metrics.get('optuna_param_importance', {})
+        optuna_importance_text = ""
+        if optuna_importance:
+            sorted_imp = sorted(optuna_importance.items(), key=lambda x: -x[1])
+            dominant = sorted_imp[0][0] if sorted_imp else None
+            optuna_importance_text = "  Optuna param importance (which dimension most affects score):\n"
+            optuna_importance_text += "    " + " | ".join(f"{k}={v:.3f}" for k,v in sorted_imp) + "\n"
             if dominant:
-                optuna_imp_txt += f"    → Afinar principalmente: {dominant} (maior impacto no score)\n"
+                optuna_importance_text += f"    → Focus mainly on: {dominant} (largest impact on score)\n"
 
-        # Feature importance do melhor resultado
-        top_feats    = m.get('top_features', [])
-        bottom_feats = m.get('bottom_features', [])
-        feat_imp_txt = ""
-        if top_feats:
-            feat_imp_txt += "  Feature importance (XGBoost):\n"
-            feat_imp_txt += "    TOP (manter/reforçar): " + ", ".join(f"{f}={v:.3f}" for f,v in top_feats[:6]) + "\n"
-            if bottom_feats:
-                feat_imp_txt += "    FRACAS (<0.02, considerar remover): " + ", ".join(f for f,_ in bottom_feats) + "\n"
-        auc_txt = ""
-        if m.get('cv_auc_mean'):
-            auc_txt = f"  CV ROC-AUC: {m['cv_auc_mean']:.4f} ± {m.get('cv_auc_std',0):.4f}\n"
+        # Feature importance of the best result
+        top_features    = metrics.get('top_features', [])
+        bottom_features = metrics.get('bottom_features', [])
+        feature_importance_text = ""
+        if top_features:
+            feature_importance_text += "  Feature importance (XGBoost):\n"
+            feature_importance_text += "    TOP (keep/reinforce): " + ", ".join(f"{f}={v:.3f}" for f,v in top_features[:6]) + "\n"
+            if bottom_features:
+                feature_importance_text += "    WEAK (<0.02, consider removing): " + ", ".join(f for f,_ in bottom_features) + "\n"
+        auc_text = ""
+        if metrics.get('cv_auc_mean'):
+            auc_text = f"  CV ROC-AUC: {metrics['cv_auc_mean']:.4f} ± {metrics.get('cv_auc_std',0):.4f}\n"
 
-        # Score breakdown por componente
-        S  = m.get('sharpe_raw', 0)
-        R  = m.get('retorno_anual_pct', 0)
-        DD = abs(m.get('max_drawdown_pct', 0))
+        # Score breakdown by component
+        S  = metrics.get('sharpe_raw', 0)
+        R  = metrics.get('retorno_anual_pct', 0)
+        DD = abs(metrics.get('max_drawdown_pct', 0))
         import math
         s_contrib  = math.tanh(S / 2) * 0.50
         r_contrib  = math.tanh(R / 100) * 0.30
         dd_penalty = (DD / 100) * 0.20
         score_breakdown = (
             f"  Score breakdown: Sharpe={s_contrib:+.3f}/0.50 | Return={r_contrib:+.3f}/0.30 | DD={-dd_penalty:.3f}/-0.20\n"
-            f"  → Maior margem disponível: "
+            f"  → Largest available margin: "
             + ("Sharpe" if (0.50 - s_contrib) > (0.30 - r_contrib) else "Return")
-            + f" ({max(0.50 - s_contrib, 0.30 - r_contrib):.3f} pontos de ganho possível)\n"
+            + f" ({max(0.50 - s_contrib, 0.30 - r_contrib):.3f} points of possible gain)\n"
         )
 
-        melhor_texto = (
-            f"\n\nMELHOR RESULTADO ATÉ AGORA (iter {melhor_registo.get('iteracao','?')}):\n"
-            f"  Score={m.get('score_composto',0):.4f} | Sharpe={m.get('sharpe_raw',0):.2f} | "
-            f"Return={m.get('retorno_anual_pct',0):+.1f}% | DD={DD:.1f}%\n"
-            f"{auc_txt}"
+        best_text = (
+            f"\n\nBEST RESULT SO FAR (iter {best_record.get('iteracao','?')}):\n"
+            f"  Score={metrics.get('score_composto',0):.4f} | Sharpe={metrics.get('sharpe_raw',0):.2f} | "
+            f"Return={metrics.get('retorno_anual_pct',0):+.1f}% | DD={DD:.1f}%\n"
+            f"{auc_text}"
             f"{score_breakdown}"
-            f"{forensic_txt}"
-            f"{optuna_imp_txt}"
-            f"{feat_imp_txt}"
-            f"  Params que geraram este resultado:\n"
-            f"    FEATURES={ps.get('FEATURES','?')}\n"
-            f"    TIMEFRAMES={ps.get('TIMEFRAMES','?')}\n"
-            f"    ENTRY_STOCH_THRESHOLD={ps.get('ENTRY_STOCH_THRESHOLD','?')} | ENTRY_ADX_THRESHOLD={ps.get('ENTRY_ADX_THRESHOLD','?')}\n"
-            f"    N_ESTIMATORS={ps.get('N_ESTIMATORS','?')} | MAX_DEPTH={ps.get('MAX_DEPTH','?')} | LR={ps.get('LEARNING_RATE','?')}\n"
-            f"    SL_RANGE={ps.get('SL_RANGE','?')} | TP_RANGE={ps.get('TP_RANGE','?')} | THRESHOLD_RANGE={ps.get('THRESHOLD_RANGE','?')}\n"
-            + (f"    XGBoost Optuna best: {m.get('xgb_optuna_best')}\n" if m.get('xgb_optuna_best') else "")
-            + f"  Análise de sensibilidade Optuna:\n"
+            f"{forensic_text}"
+            f"{optuna_importance_text}"
+            f"{feature_importance_text}"
+            f"  Params that generated this result:\n"
+            f"    FEATURES={params_snapshot.get('FEATURES','?')}\n"
+            f"    TIMEFRAMES={params_snapshot.get('TIMEFRAMES','?')}\n"
+            f"    ENTRY_STOCH_THRESHOLD={params_snapshot.get('ENTRY_STOCH_THRESHOLD','?')} | ENTRY_ADX_THRESHOLD={params_snapshot.get('ENTRY_ADX_THRESHOLD','?')}\n"
+            f"    N_ESTIMATORS={params_snapshot.get('N_ESTIMATORS','?')} | MAX_DEPTH={params_snapshot.get('MAX_DEPTH','?')} | LR={params_snapshot.get('LEARNING_RATE','?')}\n"
+            f"    SL_RANGE={params_snapshot.get('SL_RANGE','?')} | TP_RANGE={params_snapshot.get('TP_RANGE','?')} | THRESHOLD_RANGE={params_snapshot.get('THRESHOLD_RANGE','?')}\n"
+            + (f"    XGBoost Optuna best: {metrics.get('xgb_optuna_best')}\n" if metrics.get('xgb_optuna_best') else "")
+            + f"  Optuna sensitivity analysis:\n"
             + f"{sensitivity}"
-            + f"  O objetivo é SUPERAR este score. Explora dimensões ainda não testadas.\n"
+            + f"  The goal is to SURPASS this score. Explore dimensions not yet tested.\n"
         )
 
-    # Top N resultados históricos + análise de padrão
-    top_texto = ""
-    if top_registos and len(top_registos) > 1:
-        top_texto = "\n\nTOP RESULTADOS HISTÓRICOS (zona a explorar — padrão identificado):\n"
+    # Top N historical results + pattern analysis
+    top_text = ""
+    if top_records and len(top_records) > 1:
+        top_text = "\n\nTOP HISTORICAL RESULTS (region to explore — pattern identified):\n"
         tfs_counter: dict = {}
         sl_vals, tp_vals, thr_vals = [], [], []
-        for i, h in enumerate(top_registos):
-            m = h.get('metricas', {})
+        for i, h in enumerate(top_records):
+            metrics = h.get('metricas', {})
             ps = h.get('params_snapshot', {})
-            sl  = m.get('sl_pct')
-            tp  = m.get('tp_pct')
-            thr = m.get('threshold')
+            sl  = metrics.get('sl_pct')
+            tp  = metrics.get('tp_pct')
+            thr = metrics.get('threshold')
             tfs = str(ps.get('TIMEFRAMES', '?'))
-            top_texto += (
-                f"  #{i+1} iter={h.get('iteracao','?')} score={m.get('score_composto',0):.4f} | "
-                f"Sharpe={m.get('sharpe_raw',0):.2f} | Return={m.get('retorno_anual_pct',0):+.1f}% | "
-                f"DD={abs(m.get('max_drawdown_pct',0)):.1f}% | "
-                f"Trades={m.get('n_trades',0)} | WR={m.get('win_rate_pct',0):.1f}%\n"
+            top_text += (
+                f"  #{i+1} iter={h.get('iteracao','?')} score={metrics.get('score_composto',0):.4f} | "
+                f"Sharpe={metrics.get('sharpe_raw',0):.2f} | Return={metrics.get('retorno_anual_pct',0):+.1f}% | "
+                f"DD={abs(metrics.get('max_drawdown_pct',0)):.1f}% | "
+                f"Trades={metrics.get('n_trades',0)} | WR={metrics.get('win_rate_pct',0):.1f}%\n"
                 f"    Optuna best: SL={sl:.2f}% TP={tp:.2f}% Thr={thr:.3f}\n"
                 f"    TIMEFRAMES={ps.get('TIMEFRAMES','?')} | "
                 f"FEATURES={len(ps.get('FEATURES',[]))} features | "
                 f"Entry: stoch<{ps.get('ENTRY_STOCH_THRESHOLD','?')} adx>{ps.get('ENTRY_ADX_THRESHOLD','?')}\n"
             ) if sl and tp and thr else (
-                top_texto + f"  #{i+1} iter={h.get('iteracao','?')} score={m.get('score_composto',0):.4f}\n"
+                top_text + f"  #{i+1} iter={h.get('iteracao','?')} score={metrics.get('score_composto',0):.4f}\n"
             )
             if tfs not in tfs_counter:
                 tfs_counter[tfs] = 0
@@ -387,73 +387,73 @@ def propor_novos_params(params_code: str, program_md: str,
             if tp: tp_vals.append(tp)
             if thr: thr_vals.append(thr)
 
-        # Padrão comum
+        # Common pattern
         if sl_vals and tp_vals and thr_vals:
-            top_texto += (
-                f"\n  PADRÃO DOMINANTE nos top resultados:\n"
-                f"    SL médio={sum(sl_vals)/len(sl_vals):.2f}% (min={min(sl_vals):.2f} max={max(sl_vals):.2f})\n"
-                f"    TP médio={sum(tp_vals)/len(tp_vals):.2f}% (min={min(tp_vals):.2f} max={max(tp_vals):.2f})\n"
-                f"    Threshold médio={sum(thr_vals)/len(thr_vals):.3f} (min={min(thr_vals):.3f} max={max(thr_vals):.3f})\n"
-                f"    TIMEFRAMES mais frequentes: {max(tfs_counter, key=tfs_counter.get)}\n"
-                f"  → Explora VARIAÇÕES nesta zona: features diferentes, entry signal, XGBoost params.\n"
-                f"  → NÃO repitas os mesmos params — o sistema deteta duplicados automaticamente.\n"
+            top_text += (
+                f"\n  DOMINANT PATTERN in top results:\n"
+                f"    Average SL={sum(sl_vals)/len(sl_vals):.2f}% (min={min(sl_vals):.2f} max={max(sl_vals):.2f})\n"
+                f"    Average TP={sum(tp_vals)/len(tp_vals):.2f}% (min={min(tp_vals):.2f} max={max(tp_vals):.2f})\n"
+                f"    Average Threshold={sum(thr_vals)/len(thr_vals):.3f} (min={min(thr_vals):.3f} max={max(thr_vals):.3f})\n"
+                f"    Most frequent TIMEFRAMES: {max(tfs_counter, key=tfs_counter.get)}\n"
+                f"  → Explore VARIATIONS in this region: different features, entry signal, XGBoost params.\n"
+                f"  → DO NOT repeat the same params — the system detects duplicates automatically.\n"
             )
 
-    # Histórico recente (últimas 30 iterações)
-    hist_recente = historico[-30:] if len(historico) > 30 else historico
-    hist_texto = ""
-    if hist_recente:
-        hist_texto = "\n\nHISTÓRICO RECENTE (últimas 30 iterações testadas):\n"
-        for h in hist_recente:
-            m = h.get('metricas', {})
-            top_f    = m.get('top_features', [])
-            bot_f    = m.get('bottom_features', [])
-            oi       = m.get('optuna_param_importance', {})
-            hist_texto += (
+    # Recent history (last 30 iterations)
+    recent_history = history[-30:] if len(history) > 30 else history
+    history_text = ""
+    if recent_history:
+        history_text = "\n\nRECENT HISTORY (last 30 tested iterations):\n"
+        for h in recent_history:
+            metrics = h.get('metricas', {})
+            top_f    = metrics.get('top_features', [])
+            bot_f    = metrics.get('bottom_features', [])
+            oi       = metrics.get('optuna_param_importance', {})
+            history_text += (
                 f"  Iter {h.get('iteracao', '?')}: "
-                f"Score={m.get('score_composto', 0):.4f} | "
-                f"Sharpe={m.get('sharpe_raw', 0):.2f} | "
-                f"Return={m.get('retorno_anual_pct', 0):+.1f}% | "
-                f"DD={abs(m.get('max_drawdown_pct', 0)):.1f}% | "
-                f"AUC={m.get('cv_auc_mean', 0):.4f} | "
+                f"Score={metrics.get('score_composto', 0):.4f} | "
+                f"Sharpe={metrics.get('sharpe_raw', 0):.2f} | "
+                f"Return={metrics.get('retorno_anual_pct', 0):+.1f}% | "
+                f"DD={abs(metrics.get('max_drawdown_pct', 0)):.1f}% | "
+                f"AUC={metrics.get('cv_auc_mean', 0):.4f} | "
                 f"Status={h.get('status', '?')}\n"
             )
             if oi:
                 sorted_oi = sorted(oi.items(), key=lambda x: -x[1])
-                hist_texto += f"    Optuna importance: {' | '.join(f'{k}={v:.3f}' for k,v in sorted_oi)}\n"
+                history_text += f"    Optuna importance: {' | '.join(f'{k}={v:.3f}' for k,v in sorted_oi)}\n"
             if top_f:
-                hist_texto += f"    Top features: {', '.join(f'{f}={v:.3f}' for f,v in top_f[:4])}\n"
+                history_text += f"    Top features: {', '.join(f'{f}={v:.3f}' for f,v in top_f[:4])}\n"
             if bot_f:
-                hist_texto += f"    Features fracas: {', '.join(f for f,_ in bot_f)}\n"
+                history_text += f"    Weak features: {', '.join(f for f,_ in bot_f)}\n"
             if h.get('alteracoes_vs_anterior'):
-                hist_texto += f"    Alterações: {h['alteracoes_vs_anterior']}\n"
+                history_text += f"    Changes: {h['alteracoes_vs_anterior']}\n"
 
-    # Feedback de rejeições recentes
-    rejeicoes_txt = ""
-    if rejeicoes_recentes:
-        rejeicoes_txt = "\n\n⚠️  REJEIÇÕES RECENTES — NÃO REPETIR ESTES ERROS:\n"
-        for r in rejeicoes_recentes:
-            rejeicoes_txt += f"  - {r}\n"
-        rejeicoes_txt += (
-            "Estas propostas foram rejeitadas automaticamente ANTES de correr o pipeline.\n"
-            "Corrige APENAS o erro indicado. Usa SOMENTE features da lista exaustiva acima.\n"
+    # Feedback from recent rejections
+    rejections_text = ""
+    if recent_rejections:
+        rejections_text = "\n\n⚠️  RECENT REJECTIONS — DO NOT REPEAT THESE ERRORS:\n"
+        for r in recent_rejections:
+            rejections_text += f"  - {r}\n"
+        rejections_text += (
+            "These proposals were automatically rejected BEFORE running the pipeline.\n"
+            "Fix ONLY the indicated error. Use ONLY features from the exhaustive list above.\n"
         )
 
-    user_prompt = f"""DIREÇÃO DA PESQUISA (program.md):
+    user_prompt = f"""RESEARCH DIRECTION (program.md):
 {program_md}
-{melhor_texto}{top_texto}{hist_texto}{rejeicoes_txt}
+{best_text}{top_text}{history_text}{rejections_text}
 
-PARÂMETROS ATUAIS (research_params.py) — estes são os params do melhor resultado:
+CURRENT PARAMETERS (research_params.py) — these are the params of the best result:
 ```python
 {params_code}
 ```
 
-Com base no histórico e na direção da pesquisa, propõe UMA modificação
-específica e fundamentada para tentar SUPERAR o melhor score.
-Evita repetir alterações recentes que já foram rejeitadas.
-Explora dimensões novas (ex: se já testaste MAX_DEPTH, tenta agora FEATURES ou TIMEFRAMES).
+Based on the history and research direction, propose ONE specific,
+well-founded modification to try to SURPASS the best score.
+Avoid repeating recent changes that were rejected.
+Explore new dimensions (e.g., if you already tested MAX_DEPTH, try FEATURES or TIMEFRAMES now).
 
-Responde APENAS com o novo conteúdo completo do ficheiro research_params.py.
+Reply ONLY with the new complete content of the research_params.py file.
 """
 
     payload = {
@@ -468,36 +468,36 @@ Responde APENAS com o novo conteúdo completo do ficheiro research_params.py.
     }
 
     try:
-        resp = requests.post(
+        response = requests.post(
             f"{server_url}/v1/chat/completions",
             json=payload,
             timeout=timeout,
         )
-        resp.raise_for_status()
-        data = resp.json()
-        conteudo = data['choices'][0]['message']['content']
+        response.raise_for_status()
+        data = response.json()
+        content = data['choices'][0]['message']['content']
 
-        # Gravar prompt + resposta completa (inclui raciocínio descartado pelo extrair_codigo)
-        _log_llm_interaction(user_prompt, conteudo)
+        # Save prompt + full response (includes reasoning discarded by extract_code)
+        _log_llm_interaction(user_prompt, content)
 
-        return extrair_codigo(conteudo)
+        return extract_code(content)
     except requests.exceptions.ConnectionError:
-        print(f"  [AGENTE] Erro: LLM server não acessível em {server_url}")
+        print(f"  [AGENT] Error: LLM server not accessible at {server_url}")
         return None
     except requests.exceptions.Timeout:
-        print(f"  [AGENTE] Timeout ao chamar LLM ({timeout}s)")
+        print(f"  [AGENT] Timeout calling LLM ({timeout}s)")
         return None
     except Exception as e:
-        print(f"  [AGENTE] Erro inesperado: {e}")
+        print(f"  [AGENT] Unexpected error: {e}")
         return None
 
 
-def _log_llm_interaction(prompt: str, resposta: str, max_logs: int = 50) -> None:
+def _log_llm_interaction(prompt: str, response: str, max_logs: int = 50) -> None:
     """
-    Grava prompt e resposta completa do LLM em logs/llm_interactions/.
+    Saves the full LLM prompt and response to logs/llm_interactions/.
 
-    Mantém apenas os últimos max_logs pares para não encher o disco.
-    A resposta inclui o raciocínio do modelo antes do bloco de código.
+    Keeps only the last max_logs pairs to avoid filling the disk.
+    The response includes the model's reasoning before the code block.
     """
     from datetime import datetime
     log_dir = Path(__file__).parent.parent / 'logs' / 'llm_interactions'
@@ -505,81 +505,89 @@ def _log_llm_interaction(prompt: str, resposta: str, max_logs: int = 50) -> None
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     (log_dir / f"prompt_{ts}.txt").write_text(prompt, encoding='utf-8')
-    (log_dir / f"resposta_{ts}.txt").write_text(resposta, encoding='utf-8')
+    (log_dir / f"response_{ts}.txt").write_text(response, encoding='utf-8')
 
-    # Rotação: apagar os mais antigos se ultrapassar max_logs pares
+    # Rotation: delete oldest if exceeding max_logs pairs
     prompts = sorted(log_dir.glob("prompt_*.txt"))
     if len(prompts) > max_logs:
         for old in prompts[:len(prompts) - max_logs]:
             old.unlink(missing_ok=True)
             ts_old = old.stem.replace("prompt_", "")
-            resp_old = log_dir / f"resposta_{ts_old}.txt"
+            resp_old = log_dir / f"response_{ts_old}.txt"
             resp_old.unlink(missing_ok=True)
 
 
-def _validar_ranges(codigo: str) -> tuple[bool, str]:
-    """Valida que SL_RANGE, TP_RANGE e THRESHOLD_RANGE têm min <= max e respeitam focus bounds."""
+def _validate_ranges(code: str) -> tuple[bool, str]:
+    """Validates that SL_RANGE, TP_RANGE and THRESHOLD_RANGE have min <= max and respect focus bounds."""
     ns = {}
     try:
-        exec(compile(codigo, '<research_params>', 'exec'), ns)
+        exec(compile(code, '<research_params>', 'exec'), ns)
     except Exception:
-        return True, "OK"  # exec errors já apanhados por _validar_execucao
+        return True, "OK"  # exec errors already caught by _validate_execution
 
-    for nome in ('SL_RANGE', 'TP_RANGE', 'THRESHOLD_RANGE'):
-        val = ns.get(nome)
+    for name in ('SL_RANGE', 'TP_RANGE', 'THRESHOLD_RANGE'):
+        val = ns.get(name)
         if val is not None:
             try:
                 lo, hi = val
                 if lo > hi:
-                    return False, f"{nome}=({lo},{hi}) inválido: min > max — trocar os valores"
+                    return False, f"{name}=({lo},{hi}) invalid: min > max — swap values"
             except (TypeError, ValueError):
                 pass
 
     return True, "OK"
 
 
-def validar_codigo(codigo: str) -> tuple[bool, str]:
+def validate_code(code: str) -> tuple[bool, str]:
     """
-    Validação completa do código proposto.
+    Complete validation of the proposed code.
 
     Returns:
-        (valido, mensagem_erro)
+        (valid, error_message)
     """
-    ok, msg = _validar_sintaxe(codigo)
+    ok, msg = _validate_syntax(code)
     if not ok:
         return False, msg
 
-    ok, msg = _validar_execucao(codigo)
+    ok, msg = _validate_execution(code)
     if not ok:
         return False, msg
 
-    ok, msg = _validar_sem_mutacoes(codigo)
+    ok, msg = _validate_no_mutations(code)
     if not ok:
         return False, msg
 
-    ok, msg = _validar_indicadores_relativos(codigo)
+    ok, msg = _validate_relative_indicators(code)
     if not ok:
-        return False, f"Indicadores absolutos detectados: {msg}"
+        return False, f"Absolute indicators detected: {msg}"
 
-    ok, msg = _validar_params_obrigatorios(codigo)
-    if not ok:
-        return False, msg
-
-    ok, msg = _validar_features_catalogo(codigo)
+    ok, msg = _validate_required_params(code)
     if not ok:
         return False, msg
 
-    ok, msg = _validar_ranges(codigo)
+    ok, msg = _validate_catalog_features(code)
+    if not ok:
+        return False, msg
+
+    ok, msg = _validate_ranges(code)
     if not ok:
         return False, msg
 
     return True, "OK"
 
 
-def verificar_servidor_llm(server_url: str) -> bool:
-    """Verifica se o servidor LLM está acessível."""
+# Backward-compatible aliases used by main.py
+validar_codigo = validate_code
+
+
+def check_llm_server(server_url: str) -> bool:
+    """Checks whether the LLM server is accessible."""
     try:
-        resp = requests.get(f"{server_url}/health", timeout=5)
-        return resp.status_code == 200
+        response = requests.get(f"{server_url}/health", timeout=5)
+        return response.status_code == 200
     except Exception:
         return False
+
+
+# Backward-compatible alias used by main.py
+verificar_servidor_llm = check_llm_server

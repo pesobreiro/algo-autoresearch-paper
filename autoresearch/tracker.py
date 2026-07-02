@@ -1,7 +1,7 @@
 """
-Tracker de experiências — persistência JSON com tags e notas humanas.
+Experience tracker — JSON persistence with tags and human notes.
 
-Schema de uma experiência:
+Schema of an experience:
 {
     "iteracao": 12,
     "timestamp_iso": "2026-03-14T03:22:11",
@@ -36,12 +36,12 @@ from rich import box
 
 console = Console()
 
-TAGS_VALIDAS = {'promising', 'baseline', 'explorado', 'rejeitado', 'interessante', 'bug'}
+VALID_TAGS = {'promising', 'baseline', 'explorado', 'rejeitado', 'interessante', 'bug'}
 
 
 @dataclass
-class RegistoExperiencia:
-    """Registo completo de uma iteração da pesquisa."""
+class ExperimentRecord:
+    """Full record of a research iteration."""
     iteracao: int
     timestamp_iso: str
     git_commit: str
@@ -59,12 +59,12 @@ class RegistoExperiencia:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'RegistoExperiencia':
+    def from_dict(cls, d: dict) -> 'ExperimentRecord':
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
 def _git_commit_hash() -> str:
-    """Retorna o hash curto do último commit git."""
+    """Returns the short hash of the last git commit."""
     try:
         result = subprocess.run(
             ['git', 'rev-parse', '--short', 'HEAD'],
@@ -76,51 +76,51 @@ def _git_commit_hash() -> str:
 
 
 class Tracker:
-    """Gestão de experiências: guardar, carregar, tagging, análise."""
+    """Experience management: save, load, tagging, analysis."""
 
     def __init__(self, experiments_dir: Path):
         self.experiments_dir = experiments_dir
         self.experiments_dir.mkdir(parents=True, exist_ok=True)
-        self._cache: list[RegistoExperiencia] = []
-        self._carregar_cache()
+        self._cache: list[ExperimentRecord] = []
+        self._load_cache()
 
-    def _ficheiro_iteracao(self, iteracao: int) -> Path:
-        return self.experiments_dir / f'iter_{iteracao:04d}.json'
+    def _iteration_file(self, iteration: int) -> Path:
+        return self.experiments_dir / f'iter_{iteration:04d}.json'
 
-    def _carregar_cache(self):
-        """Carrega todos os registos em memória."""
+    def _load_cache(self):
+        """Loads all records into memory."""
         self._cache = []
         for f in sorted(self.experiments_dir.glob('iter_*.json')):
             try:
                 d = json.loads(f.read_text())
-                self._cache.append(RegistoExperiencia.from_dict(d))
+                self._cache.append(ExperimentRecord.from_dict(d))
             except Exception:
                 pass
 
-    def proximo_numero_iteracao(self) -> int:
+    def next_iteration_number(self) -> int:
         if not self._cache:
             return 1
         return max(r.iteracao for r in self._cache) + 1
 
-    def guardar_experiencia(self, registo: RegistoExperiencia) -> Path:
-        """Guarda uma experiência em ficheiro JSON."""
-        caminho = self._ficheiro_iteracao(registo.iteracao)
-        caminho.write_text(json.dumps(registo.to_dict(), indent=2, ensure_ascii=False))
+    def save_experience(self, record: ExperimentRecord) -> Path:
+        """Saves an experience to a JSON file."""
+        path = self._iteration_file(record.iteracao)
+        path.write_text(json.dumps(record.to_dict(), indent=2, ensure_ascii=False))
 
-        # Atualizar cache
-        self._cache = [r for r in self._cache if r.iteracao != registo.iteracao]
-        self._cache.append(registo)
+        # Update cache
+        self._cache = [r for r in self._cache if r.iteracao != record.iteracao]
+        self._cache.append(record)
         self._cache.sort(key=lambda r: r.iteracao)
 
-        return caminho
+        return path
 
-    def criar_registo(self, iteracao: int, status: str, metricas: dict,
+    def create_record(self, iteration: int, status: str, metricas: dict,
                       params_hash: str, labels_reutilizados: bool,
                       duracao: float, alteracoes: str = "",
-                      params_snapshot: dict = None) -> RegistoExperiencia:
-        """Cria um novo RegistoExperiencia."""
-        return RegistoExperiencia(
-            iteracao=iteracao,
+                      params_snapshot: dict = None) -> ExperimentRecord:
+        """Creates a new ExperimentRecord."""
+        return ExperimentRecord(
+            iteracao=iteration,
             timestamp_iso=datetime.now().isoformat(timespec='seconds'),
             git_commit=_git_commit_hash(),
             status=status,
@@ -132,42 +132,45 @@ class Tracker:
             params_snapshot=params_snapshot or {},
         )
 
-    def adicionar_tag(self, iteracao: int, tag: str, nota: str = "") -> bool:
-        """Adiciona uma tag e nota a uma experiência existente."""
-        if tag not in TAGS_VALIDAS:
-            console.print(f"[red]Tag inválida: '{tag}'. Válidas: {TAGS_VALIDAS}[/red]")
+    def add_tag(self, iteration: int, tag: str, note: str = "") -> bool:
+        """Adds a tag and note to an existing experience."""
+        if tag not in VALID_TAGS:
+            console.print(f"[red]Invalid tag: '{tag}'. Valid: {VALID_TAGS}[/red]")
             return False
 
-        caminho = self._ficheiro_iteracao(iteracao)
-        if not caminho.exists():
-            console.print(f"[red]Iteração {iteracao} não encontrada[/red]")
+        path = self._iteration_file(iteration)
+        if not path.exists():
+            console.print(f"[red]Iteration {iteration} not found[/red]")
             return False
 
-        d = json.loads(caminho.read_text())
+        d = json.loads(path.read_text())
         if tag not in d.get('tags', []):
             d.setdefault('tags', []).append(tag)
-        if nota:
-            d['nota_humana'] = nota
-        caminho.write_text(json.dumps(d, indent=2, ensure_ascii=False))
+        if note:
+            d['nota_humana'] = note
+        path.write_text(json.dumps(d, indent=2, ensure_ascii=False))
 
-        # Atualizar cache
+        # Update cache
         for r in self._cache:
-            if r.iteracao == iteracao:
+            if r.iteracao == iteration:
                 if tag not in r.tags:
                     r.tags.append(tag)
-                if nota:
-                    r.nota_humana = nota
+                if note:
+                    r.nota_humana = note
                 break
 
-        console.print(f"[green]Tag '{tag}' adicionada à iteração {iteracao}[/green]")
+        console.print(f"[green]Tag '{tag}' added to iteration {iteration}[/green]")
         return True
 
-    def carregar_experiencias_por_tag(self, tag: str) -> list[RegistoExperiencia]:
-        """Retorna experiências com a tag especificada."""
+    # Backward-compatible aliases used by main.py
+    adicionar_tag = add_tag
+
+    def load_experiences_by_tag(self, tag: str) -> list[ExperimentRecord]:
+        """Returns experiences with the specified tag."""
         return [r for r in self._cache if tag in r.tags]
 
-    def resultado_ja_encontrado(self, metricas: dict, tolerancia: float = 0.001) -> bool:
-        """Verifica se este resultado Optuna já foi encontrado antes (mesmo ótimo local)."""
+    def result_already_found(self, metricas: dict, tolerance: float = 0.001) -> bool:
+        """Checks whether this Optuna result was already found before (same local optimum)."""
         sl  = metricas.get('sl_pct')
         tp  = metricas.get('tp_pct')
         thr = metricas.get('threshold')
@@ -175,52 +178,53 @@ class Tracker:
             return False
         for r in self._cache:
             if abs(r.metricas.get('score_composto', 0)) < 0.001:
-                continue  # ignorar rejeitados de validação/duplicados
+                continue  # ignore validation/duplicate rejections
             m = r.metricas
-            if (abs(m.get('sl_pct', -1) - sl) < tolerancia and
-                abs(m.get('tp_pct', -1) - tp) < tolerancia and
-                abs(m.get('threshold', -1) - thr) < tolerancia):
+            if (abs(m.get('sl_pct', -1) - sl) < tolerance and
+                abs(m.get('tp_pct', -1) - tp) < tolerance and
+                abs(m.get('threshold', -1) - thr) < tolerance):
                 return True
         return False
 
-    def _sort_key(self, r: 'RegistoExperiencia') -> float:
-        """Chave de ordenação: sharpe_validation se disponível, senão score_composto."""
+    def _sort_key(self, r: 'ExperimentRecord') -> float:
+        """Sort key: sharpe_validation if available, otherwise score_composto."""
         sv = r.metricas.get('sharpe_validation')
         return float(sv) if sv is not None else r.metricas.get('score_composto', -999.0)
 
     def top_n_scores(self, n: int = 5) -> list[dict]:
-        """Retorna os N melhores resultados com pipeline executado (score != 0)."""
-        validos = [r for r in self._cache
+        """Returns the top N results with executed pipeline (score != 0)."""
+        valid = [r for r in self._cache
                    if abs(r.metricas.get('score_composto', 0)) > 0.001
                    or r.metricas.get('sharpe_validation') is not None]
         return [r.to_dict() for r in sorted(
-            validos, key=self._sort_key, reverse=True
+            valid, key=self._sort_key, reverse=True
         )[:n]]
 
-    def melhor_score(self) -> Optional[RegistoExperiencia]:
-        """Retorna a experiência com o melhor score (sharpe_validation ou score_composto)."""
-        aceites = [r for r in self._cache if r.status == 'aceite']
-        if not aceites:
+    def best_score(self) -> Optional[ExperimentRecord]:
+        """Returns the experience with the best score (sharpe_validation or score_composto)."""
+        accepted = [r for r in self._cache if r.status == 'aceite']
+        if not accepted:
             return None
-        return max(aceites, key=self._sort_key)
+        return max(accepted, key=self._sort_key)
 
-    def ultimo_aceite(self) -> Optional[RegistoExperiencia]:
-        """Retorna a última experiência aceite."""
-        aceites = [r for r in self._cache if r.status == 'aceite']
-        if not aceites:
+    # Backward-compatible aliases used by main.py
+    melhor_score = best_score
+
+    def last_accepted(self) -> Optional[ExperimentRecord]:
+        """Returns the last accepted experience."""
+        accepted = [r for r in self._cache if r.status == 'aceite']
+        if not accepted:
             return None
-        return max(aceites, key=lambda r: r.iteracao)
+        return max(accepted, key=lambda r: r.iteracao)
 
-    def gerar_relatorio_analise(self) -> str:
-        """Gera tabela rich com análise por tag + trend de score."""
+    def generate_analysis_report(self) -> str:
+        """Generates a rich table with tag analysis + score trend."""
         if not self._cache:
-            return "Nenhuma experiência registada ainda."
+            return "No experiences recorded yet."
 
-        linhas = []
-
-        # Tabela principal — todas as iterações
+        # Main table — all iterations
         table = Table(
-            title=f"Experiências — {len(self._cache)} iterações",
+            title=f"Experiences — {len(self._cache)} iterations",
             box=box.ROUNDED,
             show_lines=True,
         )
@@ -233,7 +237,7 @@ class Tracker:
         table.add_column("€500 OOS", justify="right", style="magenta")
         table.add_column("Trades", justify="right")
         table.add_column("Tags", style="yellow")
-        table.add_column("Nota")
+        table.add_column("Note")
 
         for r in self._cache:
             m = r.metricas
@@ -245,13 +249,13 @@ class Tracker:
 
             equity = m.get('equity_500_final')
             if equity:
-                lucro = equity - 500
-                equity_str = f"€{equity:.0f} ({lucro:+.0f})"
+                profit = equity - 500
+                equity_str = f"€{equity:.0f} ({profit:+.0f})"
             else:
-                # retroactivo: calcular a partir do retorno total se disponível
-                ret_total = m.get('retorno_total_oos_pct') or m.get('retorno_anual_pct', 0)
-                if ret_total:
-                    eq = 500 * (1 + ret_total / 100)
+                # retroactive: calculate from total return if available
+                total_return = m.get('retorno_total_oos_pct') or m.get('retorno_anual_pct', 0)
+                if total_return:
+                    eq = 500 * (1 + total_return / 100)
                     equity_str = f"€{eq:.0f} ({eq-500:+.0f})"
                 else:
                     equity_str = '—'
@@ -271,50 +275,53 @@ class Tracker:
 
         console.print(table)
 
-        # Melhor resultado
-        melhor = self.melhor_score()
-        if melhor:
-            console.print(f"\n[bold green]Melhor score:[/bold green] "
-                          f"Iter {melhor.iteracao} — "
-                          f"Score {melhor.metricas.get('score_composto', 0):.4f} | "
-                          f"Sharpe {melhor.metricas.get('sharpe_raw', 0):.2f}")
+        # Best result
+        best = self.best_score()
+        if best:
+            console.print(f"\n[bold green]Best score:[/bold green] "
+                          f"Iter {best.iteracao} — "
+                          f"Score {best.metricas.get('score_composto', 0):.4f} | "
+                          f"Sharpe {best.metricas.get('sharpe_raw', 0):.2f}")
 
-        # Por tag
-        for tag in TAGS_VALIDAS:
-            tagged = self.carregar_experiencias_por_tag(tag)
+        # By tag
+        for tag in VALID_TAGS:
+            tagged = self.load_experiences_by_tag(tag)
             if tagged:
-                console.print(f"\n[yellow]{tag}[/yellow] ({len(tagged)} iterações): "
+                console.print(f"\n[yellow]{tag}[/yellow] ({len(tagged)} iterations): "
                               f"{', '.join(str(r.iteracao) for r in tagged)}")
 
-        # Trend do score (últimas 10)
-        recentes = self._cache[-10:]
-        if len(recentes) > 1:
-            scores = [r.metricas.get('score_composto', 0) for r in recentes]
+        # Score trend (last 10)
+        recent = self._cache[-10:]
+        if len(recent) > 1:
+            scores = [r.metricas.get('score_composto', 0) for r in recent]
             trend = "↑" if scores[-1] > scores[0] else "↓"
-            console.print(f"\nTrend (últimas {len(recentes)}): {trend} "
+            console.print(f"\nTrend (last {len(recent)}): {trend} "
                           f"{scores[0]:.4f} → {scores[-1]:.4f}")
 
         return ""
 
-    def hash_ja_explorado(self, params_hash: str) -> bool:
-        """Verifica se esta configuração exacta já foi testada (aceite ou rejeitada com pipeline)."""
+    # Backward-compatible aliases used by main.py
+    gerar_relatorio_analise = generate_analysis_report
+
+    def hash_already_explored(self, params_hash: str) -> bool:
+        """Checks whether this exact config was already tested (accepted or rejected with pipeline)."""
         return any(
             r.params_hash == params_hash and r.status in ('aceite', 'rejeitado', 'erro')
-            and r.metricas.get('score_composto', 0) != 0.0  # exclui rejeições de validação (score=0)
+            and r.metricas.get('score_composto', 0) != 0.0  # exclude validation rejections (score=0)
             for r in self._cache
         )
 
-    def listar_historico(self, n: int = 10) -> list[dict]:
-        """Retorna os últimos N registos como lista de dicts."""
-        recentes = self._cache[-n:] if len(self._cache) > n else self._cache
-        return [r.to_dict() for r in recentes]
+    def list_history(self, n: int = 10) -> list[dict]:
+        """Returns the last N records as a list of dicts."""
+        recent = self._cache[-n:] if len(self._cache) > n else self._cache
+        return [r.to_dict() for r in recent]
 
-    def calcular_alteracoes(self, params_anterior: dict, params_atual: dict) -> str:
-        """Compara dois dicts de params e retorna descrição das alterações."""
-        alteracoes = []
-        for chave in params_atual:
-            if chave not in params_anterior:
-                alteracoes.append(f"{chave}: NOVO={params_atual[chave]}")
-            elif params_anterior[chave] != params_atual[chave]:
-                alteracoes.append(f"{chave}: {params_anterior[chave]}→{params_atual[chave]}")
-        return "; ".join(alteracoes) if alteracoes else "sem alterações detectadas"
+    def compute_changes(self, previous_params: dict, current_params: dict) -> str:
+        """Compares two param dicts and returns a description of changes."""
+        changes = []
+        for key in current_params:
+            if key not in previous_params:
+                changes.append(f"{key}: NEW={current_params[key]}")
+            elif previous_params[key] != current_params[key]:
+                changes.append(f"{key}: {previous_params[key]}→{current_params[key]}")
+        return "; ".join(changes) if changes else "no changes detected"
