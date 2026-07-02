@@ -28,6 +28,20 @@ Isto irá:
 
 ## Iniciar o servidor
 
+Podes usar variáveis de ambiente para tornar os scripts portáteis:
+
+- `CONDA_PREFIX` — prefixo do ambiente Python/Conda a usar (padrão: `$HOME/anaconda3/envs/ml_trading`).
+- `MODEL_DIR` — directório onde os modelos `.gguf` estão guardados (padrão: `$HOME/models/gguf`).
+- `MODEL_PATH` — caminho absoluto para um modelo específico; tem prioridade sobre o primeiro argumento do script.
+
+```bash
+# Exemplo: usar um ambiente e directório de modelos personalizados
+CONDA_PREFIX=/opt/miniconda3/envs/ml MODEL_DIR=/data/gguf ./llm/start_server.sh instruct
+
+# Exemplo: forçar um modelo específico via env var
+MODEL_PATH=/data/gguf/Qwen2.5-7B-Instruct-Q4_K_M.gguf ./llm/start_server.sh
+```
+
 ```bash
 # Janela 1 — servidor LLM (manter a correr)
 ./llm/llama.cpp/build/bin/llama-server \
@@ -37,7 +51,7 @@ Isto irá:
     --ctx-size 8192
 
 # Janela 2 — agente
-conda activate gemini
+# (active o seu ambiente Python, p.ex.: conda activate ml_trading)
 python main.py run
 ```
 

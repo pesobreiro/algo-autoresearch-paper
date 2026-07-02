@@ -9,10 +9,11 @@
 #   ./llm/start_server.sh coder 8081         # modelo coder no porto 8081
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONDA_ENV="$HOME/anaconda3/envs/ml_trading"
+CONDA_ENV="${CONDA_PREFIX:-$HOME/anaconda3/envs/ml_trading}"
 SERVER="$SCRIPT_DIR/llama.cpp/build/bin/llama-server"
-MODELS_DIR="$HOME/models/gguf"
+MODELS_DIR="${MODEL_DIR:-$HOME/models/gguf}"
 PORT="${2:-8080}"
+MODEL_PATH="${MODEL_PATH:-}"
 
 # --- Modelos disponíveis ---
 MODELS=(
@@ -23,7 +24,11 @@ MODELS=(
 # --- Selecção do modelo ---
 MODEL_ARG="${1:-instruct}"
 
-if [[ "$MODEL_ARG" == /* || "$MODEL_ARG" == ~* || "$MODEL_ARG" == ./* ]]; then
+if [[ -n "$MODEL_PATH" ]]; then
+    # MODEL_PATH tem prioridade sobre argumentos
+    MODEL="$MODEL_PATH"
+    MODEL_DESC="custom (MODEL_PATH): $MODEL"
+elif [[ "$MODEL_ARG" == /* || "$MODEL_ARG" == ~* || "$MODEL_ARG" == ./* ]]; then
     # Path absoluto/relativo passado directamente
     MODEL="$MODEL_ARG"
     MODEL_DESC="custom: $MODEL"

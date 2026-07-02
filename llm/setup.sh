@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$SCRIPT_DIR/llama.cpp"
-MODELS_DIR="$HOME/models/gguf"
+MODELS_DIR="${MODEL_DIR:-$HOME/models/gguf}"
 
 echo "═══════════════════════════════════════════════"
 echo "algo_autoresearch — Setup llama.cpp + Qwen2.5"
@@ -36,7 +36,7 @@ echo "[2/4] A compilar com CUDA (sm_89 para RTX 4090; sm_120 para RTX 5060)..."
 echo "      Isto pode demorar 10-20 minutos..."
 
 # Usar CUDA toolkit do ambiente conda ml_trading
-CONDA_ENV="$HOME/anaconda3/envs/ml_trading"
+CONDA_ENV="${CONDA_PREFIX:-$HOME/anaconda3/envs/ml_trading}"
 if [ -f "$CONDA_ENV/bin/nvcc" ]; then
     export CUDA_TOOLKIT_ROOT_DIR="$CONDA_ENV"
     export PATH="$CONDA_ENV/bin:$PATH"
@@ -150,6 +150,6 @@ echo "  # Modelo especializado em código:"
 echo "  bash llm/start_server.sh coder"
 echo ""
 echo "Depois, numa nova janela:"
-echo "  conda activate ml_trading"
+echo "  # Active o seu ambiente Python (p.ex.: conda activate ml_trading)"
 echo "  python main.py run"
 echo "═══════════════════════════════════════════════"
