@@ -32,9 +32,12 @@ from pipeline.run_pipeline import executar_pipeline, carregar_params, hash_entry
 console = Console()
 
 
-def _fmt_num(v):
-    """Formata número com 2 casas decimais; valores não-numéricos são devolvidos como string."""
-    return f"{v:.2f}" if isinstance(v, (int, float)) else str(v)
+def _fmt_num(v, decimals=2, sign=False):
+    """Formata número com `decimals` casas decimais; valores não-numéricos são devolvidos como string."""
+    if isinstance(v, (int, float)):
+        fmt = f"{{:{'+' if sign else ''}.{decimals}f}}"
+        return fmt.format(v)
+    return str(v)
 
 
 def verificar_pre_requisitos(config: dict) -> tuple[bool, list[str]]:
@@ -179,17 +182,17 @@ def _actualizar_program_md_top(program_path: Path, top_registos: list[dict]):
         sh    = m.get('sharpe_holdout')
         auc   = m.get('cv_auc_mean', 0)
         if sv is not None:
-            score_fmt = (f"AUC={auc:.3f} | Sharpe(val)={sv:.2f} | "
-                         f"Sharpe(holdout)={sh:.2f}" if sh is not None else f"AUC={auc:.3f} | Sharpe(val)={sv:.2f}")
+            score_fmt = (f"AUC={_fmt_num(auc, 3)} | Sharpe(val)={_fmt_num(sv, 2)} | "
+                         f"Sharpe(holdout)={_fmt_num(sh, 2)}" if sh is not None else f"AUC={_fmt_num(auc, 3)} | Sharpe(val)={_fmt_num(sv, 2)}")
         else:
-            score_fmt = f"score={score:.4f}"
+            score_fmt = f"score={_fmt_num(score, 4)}"
         linhas.append(
             f"**#{i+1} iter={h.get('iteracao','?')}** {score_fmt} | "
-            f"DD={abs(m.get('max_drawdown_pct',0)):.1f}% | Trades={m.get('n_trades',0)} | "
-            f"WR={m.get('win_rate_pct',0):.1f}%  \n"
+            f"DD={_fmt_num(abs(m.get('max_drawdown_pct', 0)), 1)}% | Trades={m.get('n_trades', 0)} | "
+            f"WR={_fmt_num(m.get('win_rate_pct', 0), 1)}%  \n"
         )
-        if sl and tp and thr:
-            linhas.append(f"→ SL={sl:.2f}% TP={tp:.2f}% Thr={thr:.3f} | TFs={tfs} | "
+        if isinstance(sl, (int, float)) and isinstance(tp, (int, float)) and isinstance(thr, (int, float)):
+            linhas.append(f"→ SL={_fmt_num(sl, 2)}% TP={_fmt_num(tp, 2)}% Thr={_fmt_num(thr, 3)} | TFs={tfs} | "
                           f"Entry: stoch<{ps.get('ENTRY_STOCH_THRESHOLD','?')} adx>{ps.get('ENTRY_ADX_THRESHOLD','?')}  \n\n")
             sl_vals.append(sl); tp_vals.append(tp); thr_vals.append(thr)
         tfs_key = str(tfs)
@@ -198,10 +201,10 @@ def _actualizar_program_md_top(program_path: Path, top_registos: list[dict]):
     if sl_vals:
         tfs_dom = max(tfs_counter, key=tfs_counter.get)
         linhas.append(
-            f"**Padrão dominante:** SL={sum(sl_vals)/len(sl_vals):.1f}% "
-            f"(±{(max(sl_vals)-min(sl_vals))/2:.1f}) | "
-            f"TP={sum(tp_vals)/len(tp_vals):.1f}% (±{(max(tp_vals)-min(tp_vals))/2:.1f}) | "
-            f"Thr={sum(thr_vals)/len(thr_vals):.2f} | TFs={tfs_dom}  \n"
+            f"**Padrão dominante:** SL={_fmt_num(sum(sl_vals)/len(sl_vals), 1)}% "
+            f"(±{_fmt_num((max(sl_vals)-min(sl_vals))/2, 1)}) | "
+            f"TP={_fmt_num(sum(tp_vals)/len(tp_vals), 1)}% (±{_fmt_num((max(tp_vals)-min(tp_vals))/2, 1)}) | "
+            f"Thr={_fmt_num(sum(thr_vals)/len(thr_vals), 2)} | TFs={tfs_dom}  \n"
             f"→ Explora variações de features e entry signal nesta zona. Não repitas params iguais.\n"
         )
 
@@ -278,18 +281,18 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
             score_baseline = float(sv) if sv is not None else ultimo.metricas.get('score_composto', 0.0)
         params_anteriores = ultimo.params_snapshot
         console.print(f"[cyan]Retomando pesquisa. Última aceite: iter {ultimo.iteracao}, "
-                      f"score={score_baseline:.4f}[/cyan]")
+                      f"score={_fmt_num(score_baseline, 4)}[/cyan]")
     else:
         score_baseline = baseline_override
         if baseline_override > 0:
-            console.print(f"[cyan]Nova temporada. Baseline mínimo definido: {baseline_override:.4f}[/cyan]")
+            console.print(f"[cyan]Nova temporada. Baseline mínimo definido: {_fmt_num(baseline_override, 4)}[/cyan]")
         else:
             score_baseline = 0.0
 
     console.print(Panel(
         f"[bold green]algo_autoresearch — Loop de Pesquisa[/bold green]\n"
         f"Iteração inicial: {iteracao}\n"
-        f"Score baseline: {score_baseline:.4f}\n"
+        f"Score baseline: {_fmt_num(score_baseline, 4)}\n"
         f"Max iterações: {'∞' if max_iteracoes == 0 else max_iteracoes}",
         border_style="green",
     ))
@@ -319,7 +322,7 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
             break
 
         console.print(f"\n[bold cyan]══ Iteração {iteracao} ══[/bold cyan]  "
-                      f"[dim]temp={temp_atual:.2f} | sem_melhoria={iters_sem_melhoria}[/dim]")
+                      f"[dim]temp={_fmt_num(temp_atual, 2)} | sem_melhoria={iters_sem_melhoria}[/dim]")
 
         # --- 1. Carregar params atuais ---
         codigo_atual = params_path.read_text()
@@ -403,7 +406,7 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
             if iters_sem_melhoria >= stagnation_threshold:
                 temp_anterior = temp_atual
                 temp_atual = min(t_max, temp_atual * t_grow)
-                console.print(f"  [dim]temp {temp_anterior:.2f}→{temp_atual:.2f} (explore — stagnação)[/dim]")
+                console.print(f"  [dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (explore — stagnação)[/dim]")
             registo = tracker.criar_registo(
                 iteracao=iteracao,
                 status='rejeitado',
@@ -481,13 +484,13 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
             temp_atual = max(t_min, temp_atual * t_decay)
             iters_sem_melhoria = 0
             if objective_mode == 'profit':
-                console.print(f"  [bold green]✓ ACEITE (retorno {score_baseline:+.1f}%)[/bold green]  "
-                              f"[dim]temp {temp_anterior:.2f}→{temp_atual:.2f} (decay)[/dim]")
+                console.print(f"  [bold green]✓ ACEITE (retorno {_fmt_num(score_baseline, 1, sign=True)}%)[/bold green]  "
+                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (decay)[/dim]")
             else:
-                console.print(f"  [bold green]✓ ACEITE | AUC={auc_atual:.3f} | "
-                              f"Sharpe(val)={sharpe_validation:.2f} | "
-                              f"Sharpe(holdout/passivo)={sharpe_holdout_v:.2f}[/bold green]  "
-                              f"[dim]temp {temp_anterior:.2f}→{temp_atual:.2f} (decay)[/dim]")
+                console.print(f"  [bold green]✓ ACEITE | AUC={_fmt_num(auc_atual, 3)} | "
+                              f"Sharpe(val)={_fmt_num(sharpe_validation, 2)} | "
+                              f"Sharpe(holdout/passivo)={_fmt_num(sharpe_holdout_v, 2)}[/bold green]  "
+                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (decay)[/dim]")
             # Preservar modelo aceite de limpeza pelo cleanup
             season = config.get('agent', {}).get('season', 0)
             _guardar_melhor_modelo(cache_dir, hash_novo, iteracao, season,
@@ -495,13 +498,13 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
         else:
             status = 'rejeitado' if resultado.sucesso else 'erro'
             if objective_mode == 'profit':
-                razao = (f"retorno {score_atual:+.1f}% ≤ baseline {score_baseline:+.1f}% + {accept_threshold}%"
+                razao = (f"retorno {_fmt_num(score_atual, 1, sign=True)}% ≤ baseline {_fmt_num(score_baseline, 1, sign=True)}% + {accept_threshold}%"
                          if resultado.sucesso else resultado.erro)
             else:
                 if resultado.sucesso:
-                    razao = (f"AUC={auc_atual:.3f}(≥{accept_auc_min}) | "
-                             f"Sharpe(val)={sharpe_validation:.2f}(≥{accept_sharpe_min}) | "
-                             f"Sharpe(holdout)={sharpe_holdout_v:.2f}(≥{accept_sharpe_holdout_min})")
+                    razao = (f"AUC={_fmt_num(auc_atual, 3)}(≥{accept_auc_min}) | "
+                             f"Sharpe(val)={_fmt_num(sharpe_validation, 2)}(≥{accept_sharpe_min}) | "
+                             f"Sharpe(holdout)={_fmt_num(sharpe_holdout_v, 2)}(≥{accept_sharpe_holdout_min})")
                 else:
                     razao = resultado.erro
             # Sem melhoria → contar; se ultrapassar threshold, aumentar temperatura (explore)
@@ -510,7 +513,7 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
                 temp_anterior = temp_atual
                 temp_atual = min(t_max, temp_atual * t_grow)
                 console.print(f"  [yellow]✗ REVERTIDO ({razao})[/yellow]  "
-                              f"[dim]temp {temp_anterior:.2f}→{temp_atual:.2f} (explore)[/dim]")
+                              f"[dim]temp {_fmt_num(temp_anterior, 2)}→{_fmt_num(temp_atual, 2)} (explore)[/dim]")
             else:
                 console.print(f"  [yellow]✗ REVERTIDO ({razao})[/yellow]  "
                               f"[dim]{iters_sem_melhoria}/{stagnation_threshold} sem melhoria[/dim]")
