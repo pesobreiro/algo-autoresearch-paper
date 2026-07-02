@@ -1,12 +1,12 @@
-# Deployment — Modelos em Produção
+# Deployment — Production Models
 
-## Modelo 1 — S11 iter 1077 — BNB/USDT — EM PRODUÇÃO
+## Model 1 — S11 iter 1077 — BNB/USDT — IN PRODUCTION
 
 **Iter 1077** — Season 11 — BNB/USDT 15m
 
 ```
 SL=7.80%  TP=7.10%  Threshold=0.857  ADX_min=22
-ATR kill-switch: atr_regime > 3.0 → sem sinal
+ATR kill-switch: atr_regime > 3.0 → no signal
 Fee: 0.2% round-trip  |  Slippage: 0.1%
 TFs: 15m + 4h + 1d
 ```
@@ -19,9 +19,9 @@ btc_trend, atr_pct_1d, adx_1d, rsi_1d, stoch_rsi_k_1d, volume_norm, ema_diff_4h,
 bb_width_pct_15m
 ```
 
-### Performance (€500 inicial por ano, backtests independentes)
+### Performance (€500 initial capital per year, independent backtests)
 
-| Ano | Ret% | Sharpe | DD% | Trades | WR% | Equity |
+| Year | Ret% | Sharpe | DD% | Trades | WR% | Equity |
 |-----|------|--------|-----|--------|-----|--------|
 | 2022 | +16.75% | 1.40 | -6.74% | 82 | 65.9% | €584 |
 | 2023 | +7.80% | 1.05 | -5.86% | 27 | 70.4% | €539 |
@@ -38,23 +38,23 @@ python deployment/backtest_deploy.py --iter 1077 --season 11 \
     --years 2022 2023 2024 2025 2026
 ```
 
-### Modelo
+### Model
 
 ```
 best_models/season_11/iter_1077/
 ├── model/          # XGBoost + feature names
-└── meta.json       # params + métricas da season
+└── meta.json       # params + season metrics
 ```
 
 ---
 
-## Modelo 2 — S12 iter 5502 — BTC/USDC — CANDIDATO DEPLOY
+## Model 2 — S12 iter 5502 — BTC/USDC — DEPLOY CANDIDATE
 
 **Iter 5502** — Season 12 — BTC/USDC 15m
 
 ```
 SL=9.70%  TP=9.12%  Threshold=0.890  ADX_min=25
-ATR kill-switch: atr_regime > 3.0 → sem sinal
+ATR kill-switch: atr_regime > 3.0 → no signal
 Fee: 0.2% round-trip  |  Slippage: 0.1%
 TFs: 15m + 4h + 1d
 ```
@@ -67,9 +67,9 @@ atr_regime_4h, macd_signal_pct_1d, macd_pct_1d, bb_width_pct_1d,
 atr_regime_15m, dist_sma200_pct_4h, macd_pct_15m, stoch_rsi_d_1d, ema_diff_4h
 ```
 
-### Performance (€500 inicial, carry-forward, composto)
+### Performance (€500 initial capital, carry-forward, compounded)
 
-| Ano | Ret% | Sharpe | DD% | Trades | WR% | Equity |
+| Year | Ret% | Sharpe | DD% | Trades | WR% | Equity |
 |-----|------|--------|-----|--------|-----|--------|
 | 2021 | +3.7% | 0.69 | -4.6% | 13 | 69% | €519 |
 | 2022 | +13.0% | 1.79 | -1.1% | 21 | 81% | €586 |
@@ -78,13 +78,13 @@ atr_regime_15m, dist_sma200_pct_4h, macd_pct_15m, stoch_rsi_d_1d, ema_diff_4h
 | **2025 OOS** | **+9.6%** | **1.27** | **-4.5%** | **32** | **66%** | **€816** |
 | **Total** | **+63%** | — | **-9.3%** | **135** | **73%** | **€816** |
 
-### Alternativas Avaliadas (S12)
+### Evaluated Alternatives (S12)
 
-| Iter | sv | sh | DD% | Trades | Capital final | Notas |
+| Iter | sv | sh | DD% | Trades | Final capital | Notes |
 |------|----|----|-----|--------|---------------|-------|
-| **5502** | 1.39 | 1.15 | -9.3% | 135 | **€816** | **seleccionado** |
-| 5446 | 1.43 | 0.98 | -12.9% | 144 | €630 | DD alto 2021–2022 |
-| 1736 | 1.06 | 1.23 | -5.1% | 88 | €623 | val fraca 2022–2023 |
+| **5502** | 1.39 | 1.15 | -9.3% | 135 | **€816** | **selected** |
+| 5446 | 1.43 | 0.98 | -12.9% | 144 | €630 | high DD 2021–2022 |
+| 1736 | 1.06 | 1.23 | -5.1% | 88 | €623 | weak val 2022–2023 |
 
 ### Scripts
 
@@ -93,26 +93,26 @@ python deployment/backtest_deploy.py --iter 5502 --season 12 \
     --sl 9.70 --tp 9.12 --thr 0.890 --ticker btc \
     --years 2021 2022 2023 2024 2025
 
-# Sem carry-forward (€500 independentes por ano)
+# Without carry-forward (€500 independent per year)
 python deployment/backtest_deploy.py --iter 5502 --season 12 \
     --sl 9.70 --tp 9.12 --thr 0.890 --ticker btc --no-compound
 ```
 
-### Modelo
+### Model
 
 ```
 best_models/season_12/iter_5502/
 ├── model/          # XGBoost + feature names
-└── meta.json       # params + métricas da season
+└── meta.json       # params + season metrics
 ```
 
 ---
 
-## Comparação Cross-Season
+## Cross-Season Comparison
 
-| Modelo | Activo | Capital Final | Ret% Total | Sharpe OOS | DD máx | Trades/ano |
+| Model | Asset | Final Capital | Total Ret% | OOS Sharpe | Max DD | Trades/year |
 |--------|--------|---------------|------------|------------|--------|------------|
 | **S11 iter 1077** | BNB | — | **+58.2%** | **2.87** | **-6.74%** | ~32 |
 | S12 iter 5502 | BTC | €816 | +63% | 1.27 | -9.3% | ~27 |
 
-S11/BNB apresenta melhor Sharpe OOS e drawdown máximo mais baixo; S12/BTC regista retorno total ligeiramente superior no cenário de backtest independente. BNB mostra microestrutura mais favorável para mean-reversion que BTC (menos ruído institucional/macro).
+S11/BNB shows better OOS Sharpe and lower maximum drawdown; S12/BTC records slightly higher total return in the independent-backtest scenario. BNB displays a microstructure more favourable to mean-reversion than BTC (less institutional/macro noise).

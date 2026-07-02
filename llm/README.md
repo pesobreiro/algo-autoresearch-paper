@@ -3,89 +3,89 @@
 ## Hardware
 
 - GPU: NVIDIA RTX 5060 8GB (Blackwell, compute capability sm_120)
-- VRAM necessária: ~5.4 GB (Qwen2.5-7B Q4_K_M com 32 layers na GPU)
-- Compatível também com RTX 4090/4080 (Ada, sm_89)
+- Required VRAM: ~5.4 GB (Qwen2.5-7B Q4_K_M with 32 layers on GPU)
+- Also compatible with RTX 4090/4080 (Ada, sm_89)
 
-## Modelo
+## Model
 
 **Qwen2.5-7B-Instruct Q4_K_M**
-- Tamanho: ~5.4 GB
-- Contexto: 8192 tokens (suficiente para research_params.py + histórico)
-- Qualidade: bom equilíbrio entre velocidade e qualidade de código
+- Size: ~5.4 GB
+- Context: 8192 tokens (enough for research_params.py + history)
+- Quality: good balance between speed and code quality
 
-## Instalação rápida
+## Quick install
 
 ```bash
-# A partir da raiz do projecto
+# From the project root
 bash llm/setup.sh
 ```
 
-Isto irá:
-1. Clonar `llama.cpp` de https://github.com/ggerganov/llama.cpp
-2. Compilar com CUDA (`-DCMAKE_CUDA_ARCHITECTURES="89;120"`)
-3. Fazer download do modelo (~5.4 GB)
-4. Testar o servidor
+This will:
+1. Clone `llama.cpp` from https://github.com/ggerganov/llama.cpp
+2. Compile with CUDA (`-DCMAKE_CUDA_ARCHITECTURES="89;120"`)
+3. Download the model (~5.4 GB)
+4. Test the server
 
-## Iniciar o servidor
+## Starting the server
 
-Podes usar variáveis de ambiente para tornar os scripts portáteis:
+You can use environment variables to make the scripts portable:
 
-- `CONDA_PREFIX` — prefixo do ambiente Python/Conda a usar (padrão: `$HOME/anaconda3/envs/ml_trading`).
-- `MODEL_DIR` — directório onde os modelos `.gguf` estão guardados (padrão: `$HOME/models/gguf`).
-- `MODEL_PATH` — caminho absoluto para um modelo específico; tem prioridade sobre o primeiro argumento do script.
+- `CONDA_PREFIX` — Python/Conda environment prefix to use (default: `$HOME/anaconda3/envs/ml_trading`).
+- `MODEL_DIR` — directory where `.gguf` models are stored (default: `$HOME/models/gguf`).
+- `MODEL_PATH` — absolute path to a specific model; takes priority over the script's first argument.
 
 ```bash
-# Exemplo: usar um ambiente e directório de modelos personalizados
+# Example: use a custom environment and model directory
 CONDA_PREFIX=/opt/miniconda3/envs/ml MODEL_DIR=/data/gguf ./llm/start_server.sh instruct
 
-# Exemplo: forçar um modelo específico via env var
+# Example: force a specific model via env var
 MODEL_PATH=/data/gguf/Qwen2.5-7B-Instruct-Q4_K_M.gguf ./llm/start_server.sh
 ```
 
 ```bash
-# Janela 1 — servidor LLM (manter a correr)
+# Window 1 — LLM server (keep running)
 ./llm/llama.cpp/build/bin/llama-server \
     --model ~/models/gguf/Qwen2.5-7B-Instruct-Q4_K_M.gguf \
     --port 8080 \
     --n-gpu-layers 32 \
     --ctx-size 8192
 
-# Janela 2 — agente
-# (active o seu ambiente Python, p.ex.: conda activate ml_trading)
+# Window 2 — agent
+# (activate your Python environment, e.g. conda activate ml_trading)
 python main.py run
 ```
 
-## Parâmetros do servidor
+## Server parameters
 
-| Parâmetro | Valor | Razão |
-|-----------|-------|-------|
-| `--n-gpu-layers 32` | 32/32 | Modelo cabe inteiro na VRAM |
-| `--ctx-size 8192` | 8192 tokens | research_params.py + histórico + prompt |
-| `--port 8080` | 8080 | Configurável em config.yaml |
+| Parameter | Value | Reason |
+|-----------|-------|--------|
+| `--n-gpu-layers 32` | 32/32 | Model fits entirely in VRAM |
+| `--ctx-size 8192` | 8192 tokens | research_params.py + history + prompt |
+| `--port 8080` | 8080 | Configurable in config.yaml |
 
-## Verificar se está a correr
+## Check it is running
 
 ```bash
 curl http://localhost:8080/health
-# Esperar: {"status":"ok"}
+# Expected: {"status":"ok"}
 ```
 
-## Alternativas
+## Alternatives
 
-Se não tiver GPU com 8GB+, pode usar versão menor:
-- **Qwen2.5-3B Q4_K_M** (~2GB VRAM) — qualidade inferior
-- **Qwen2.5-7B Q2_K** (~3GB VRAM) — compressão mais agressiva
-- **llama.cpp CPU** — remover `--n-gpu-layers 32` (muito mais lento)
+If you do not have a GPU with 8GB+, you can use a smaller version:
+- **Qwen2.5-3B Q4_K_M** (~2GB VRAM) — lower quality
+- **Qwen2.5-7B Q2_K** (~3GB VRAM) — more aggressive compression
+- **llama.cpp CPU** — remove `--n-gpu-layers 32` (much slower)
 
 ## Troubleshooting
 
 ```bash
-# Verificar CUDA
+# Check CUDA
 nvidia-smi
 
-# Verificar compute capability
+# Check compute capability
 nvidia-smi --query-gpu=compute_cap --format=csv
 
-# Rebuild se necessário
+# Rebuild if needed
 cd llm/llama.cpp/build && cmake --build . --config Release -j$(nproc)
 ```

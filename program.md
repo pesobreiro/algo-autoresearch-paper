@@ -1,36 +1,36 @@
-# Direção da Pesquisa — algo_autoresearch S12
+# Research Direction — algo_autoresearch S12
 
-Este ficheiro guia o agente LLM nas suas decisões de modificação de parâmetros.
+This file guides the LLM agent in its parameter-modification decisions.
 
 ---
 
-## Season 12 — BTC/USDC — Concluída
+## Season 12 — BTC/USDC — Completed
 
-**107 aceites** em ~9900 iterações. Modelo de deploy seleccionado: **iter 5502**.
+**107 accepted** in ~9900 iterations. Selected deploy model: **iter 5502**.
 
-### Modelo Deploy
+### Deploy Model
 ```
 SL=9.70%  TP=9.12%  Threshold=0.890  ADX_min=25
 TFs: 15m + 4h + 1d  |  REG_ALPHA=7.0  REG_LAMBDA=7.0
-Capital final (2021→2025): €816 (+63.2%)  |  2025 OOS: Sharpe=1.27
+Final capital (2021→2025): €816 (+63.2%)  |  2025 OOS: Sharpe=1.27
 ```
 
 ---
 
-## Design de Dados S12 — Imutável
+## S12 Immutable Data Design
 
-| Período | Papel | Optuna pode usar? |
+| Period | Role | Can Optuna use? |
 |---------|-------|-------------------|
 | 2017–2020 | Train (XGBoost) | — |
-| 2021 | Validação | ✅ SIM |
-| 2022 | Validação (bear — FTX crash) | ✅ SIM |
-| 2023 | Validação (bull recovery) | ✅ SIM |
-| 2024 | **Holdout** | ❌ NÃO — passivo |
-| 2025 | **Holdout** | ❌ NÃO — passivo |
+| 2021 | Validation | YES |
+| 2022 | Validation (bear — FTX crash) | YES |
+| 2023 | Validation (bull recovery) | YES |
+| 2024 | **Holdout** | NO — passive |
+| 2025 | **Holdout** | NO — passive |
 
 ---
 
-## Critério de Aceitação S12
+## S12 Acceptance Criterion
 
 ```
 cv_auc_mean ≥ 0.51
@@ -40,55 +40,55 @@ AND sharpe_holdout ≥ 0.3
 
 ---
 
-## O Que Podes Modificar
+## What You Can Modify
 
-**Features** — qualquer subconjunto do catálogo:
-- Osciladores: `stoch_rsi_k`, `stoch_rsi_d`, `rsi`, `bb_position`, `adx`
+**Features** — any subset of the catalog:
+- Oscillators: `stoch_rsi_k`, `stoch_rsi_d`, `rsi`, `bb_position`, `adx`
 - Momentum: `ema_diff`, `trend`, `returns_1`, `returns_5`
-- Volatilidade: `atr_pct`, `bb_width_pct`, `atr_regime`
+- Volatility: `atr_pct`, `bb_width_pct`, `atr_regime`
 - MACD: `macd_pct`, `macd_signal_pct`, `macd_hist_pct`
 - Volume: `volume_norm`
-- Macro (1d only): `dist_sma200_pct`, `btc_trend` ← **nunca remover estes dois**
+- Macro (1d only): `dist_sma200_pct`, `btc_trend` ← **never remove these two**
 
-**Timeframes** — qualquer subconjunto de `["15m", "4h", "1d"]`
+**Timeframes** — any subset of `["15m", "4h", "1d"]`
 
-**XGBoost** — explorar:
+**XGBoost** — explore:
 - `N_ESTIMATORS`: 300–1000, `MAX_DEPTH`: 3–10, `LEARNING_RATE`: 0.01–0.30
 - `MIN_CHILD_WEIGHT`: 5–80, `GAMMA`: 0–3, `SUBSAMPLE`: 0.6–1.0
 - `COLSAMPLE_BYTREE`: 0.6–1.0, `REG_ALPHA`: 0–10, `REG_LAMBDA`: 0–10
 
-**Bounds Optuna**:
-- `SL_RANGE`: tuplo (min, max) com 1.0 <= min < max <= 15.0
-- `TP_RANGE`: tuplo (min, max) com 2.0 <= min < max <= 20.0
-- `THRESHOLD_RANGE`: tuplo com 0.70 <= min < max <= 0.99
+**Optuna Bounds**:
+- `SL_RANGE`: tuple (min, max) with 1.0 <= min < max <= 15.0
+- `TP_RANGE`: tuple (min, max) with 2.0 <= min < max <= 20.0
+- `THRESHOLD_RANGE`: tuple with 0.70 <= min < max <= 0.99
 
 ---
 
-## Regras Absolutas
+## Absolute Rules
 
-1. **APENAS indicadores relativos** — nunca usar preços absolutos
-2. Usar apenas features do catálogo `pipeline/features_catalog.py`
-3. `SL_RANGE`, `TP_RANGE`, `THRESHOLD_RANGE` são **tuplos (min, max)** com min < max
-4. **`OBJECTIVE_MODE = "score"`** — NÃO remover, NÃO alterar, NÃO omitir
+1. **ONLY relative indicators** — never use absolute prices
+2. Use only features from the catalog `pipeline/features_catalog.py`
+3. `SL_RANGE`, `TP_RANGE`, `THRESHOLD_RANGE` are **tuples (min, max)** with min < max
+4. **`OBJECTIVE_MODE = "score"`** — DO NOT remove, DO NOT change, DO NOT omit
 5. `N_TRIALS` <= 200
-6. `btc_trend` e `dist_sma200_pct` **nunca remover** — contexto macro obrigatório
+6. `btc_trend` and `dist_sma200_pct` **never remove** — mandatory macro context
 
 ---
 
-## Notas S12
+## S12 Notes
 
-- **Features 1d dominantes**: `bb_width_pct_1d`, `macd_signal_pct_1d`, `stoch_rsi_k_1d` — manter TF 1d
-- **REG_ALPHA/LAMBDA=7.0** mostrou-se mais estável que 3.5 para BTC
-- **Threshold dominante** (importância Optuna ~0.85) — afinar THRESHOLD_RANGE é a alavanca principal
-- **2025 regime extremo**: BTC subiu a 125k e desceu a 60k — qualquer modelo com sh>1.0 em 2025 é excepcional
-- **THRESHOLD_RANGE mínimo**: não descer abaixo de 0.70 — gera demasiados falsos positivos em BTC
+- **Dominant 1d features**: `bb_width_pct_1d`, `macd_signal_pct_1d`, `stoch_rsi_k_1d` — keep TF 1d
+- **REG_ALPHA/LAMBDA=7.0** proved more stable than 3.5 for BTC
+- **Threshold dominates** (Optuna importance ~0.85) — tuning THRESHOLD_RANGE is the main lever
+- **2025 extreme regime**: BTC rallied to 125k and dropped to 60k — any model with sh>1.0 in 2025 is exceptional
+- **Minimum THRESHOLD_RANGE**: do not go below 0.70 — generates too many false positives in BTC
 
 ---
 
-## 📊 Top 5 Aceites S12 (por deploy score)
+## Top 5 S12 Accepted (by deploy score)
 
 **#1 iter=5502** sv=1.39 | sh=1.15 | 2024=€577 | 2025=€638 | score=0.95
-→ SL=9.70% TP=9.12% Thr=0.890 | TFs=['15m','4h','1d'] ← **SELECCIONADO**
+→ SL=9.70% TP=9.12% Thr=0.890 | TFs=['15m','4h','1d'] ← **SELECTED**
 
 **#2 iter=5446** sv=1.43 | sh=0.98 | 2024=€622 | 2025=€665 | score=0.79
 → SL=10.39% TP=9.15% Thr=0.874 | TFs=['15m','4h','1d']
