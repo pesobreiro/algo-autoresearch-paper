@@ -523,7 +523,7 @@ def setup(config_path):
 
     # 3. Dados
     try:
-        import config as ml_config
+        import ml_sessions_compat.config as ml_config
         ticker = config['pipeline']['ticker']
         exchange = config['pipeline'].get('exchange', 'binance')
         data_dir = Path(ml_config.DATA_DIR)
