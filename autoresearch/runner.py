@@ -32,6 +32,11 @@ from pipeline.run_pipeline import executar_pipeline, carregar_params, hash_entry
 console = Console()
 
 
+def _fmt_num(v):
+    """Formata número com 2 casas decimais; valores não-numéricos são devolvidos como string."""
+    return f"{v:.2f}" if isinstance(v, (int, float)) else str(v)
+
+
 def verificar_pre_requisitos(config: dict) -> tuple[bool, list[str]]:
     """
     Verifica pré-requisitos antes de iniciar o loop.
@@ -445,8 +450,8 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
             tp  = resultado.metricas.get('tp_pct', '?')
             thr = resultado.metricas.get('threshold', '?')
             console.print(f"  [yellow]✗ RESULTADO DUPLICADO: Optuna convergiu para o mesmo ótimo "
-                          f"(SL={sl:.2f}% TP={tp:.2f}% T={thr:.2f}) — escapar desta zona[/yellow]")
-            msg_res = f"Resultado duplicado: Optuna encontrou SL={sl:.2f}% TP={tp:.2f}% T={thr:.2f} — mudar features ou TIMEFRAMES para escapar"
+                          f"(SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)}) — escapar desta zona[/yellow]")
+            msg_res = f"Resultado duplicado: Optuna encontrou SL={_fmt_num(sl)}% TP={_fmt_num(tp)}% T={_fmt_num(thr)} — mudar features ou TIMEFRAMES para escapar"
             rejeicoes_recentes.append(msg_res)
             rejeicoes_recentes = rejeicoes_recentes[-5:]
             iters_sem_melhoria += 1
@@ -459,7 +464,7 @@ def executar_loop(config: dict, max_iteracoes: int = 0,
                 params_hash=hash_params_completo(params_novos),
                 labels_reutilizados=resultado.labels_reutilizados,
                 duracao=duracao,
-                alteracoes=f"RESULTADO DUPLICADO: SL={sl:.2f}% TP={tp:.2f}%",
+                alteracoes=f"RESULTADO DUPLICADO: SL={_fmt_num(sl)}% TP={_fmt_num(tp)}%",
                 params_snapshot=params_novos,
             )
             tracker.guardar_experiencia(registo)
