@@ -41,8 +41,10 @@ Supporting code, data specification and reproducibility artifacts for the paper 
 
 5. Re-run a case-study backtest:
    ```bash
-   python deployment/backtest_deploy.py --season 11 --iter 1077
-   python deployment/backtest_deploy.py --season 12 --iter 5502
+   python deployment/backtest_deploy.py --season 11 --iter 1077 \
+       --sl 7.80 --tp 7.10 --thr 0.857 --ticker bnb
+   python deployment/backtest_deploy.py --season 12 --iter 5502 \
+       --sl 9.70 --tp 9.12 --thr 0.890 --ticker btc
    ```
 
 ## Data
