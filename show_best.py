@@ -1,9 +1,9 @@
 """
-Apresentação dos melhores setups encontrados pelo algo_autoresearch.
+Show the best setups found by algo_autoresearch.
 
-Uso:
-  python show_best.py                    # top 10 aceites (temporada do config.yaml)
-  python show_best.py --season 2         # temporada 2
+Usage:
+  python show_best.py                    # top 10 accepted (season from config.yaml)
+  python show_best.py --season 2         # season 2
   python show_best.py --season 1 --top 5
   python show_best.py --all
   python show_best.py --full 32
@@ -31,7 +31,7 @@ def _experiments_dir(season: int) -> Path:
 
 
 def _season_from_config() -> int:
-    """Lê a temporada actual do config.yaml (fallback: 1)."""
+    """Reads the current season from config.yaml (fallback: 1)."""
     try:
         import yaml
         cfg = Path(__file__).parent / 'config.yaml'
@@ -43,7 +43,7 @@ def _season_from_config() -> int:
         return 1
 
 
-def carregar_aceites(experiments_dir: Path) -> list[dict]:
+def load_accepted(experiments_dir: Path) -> list[dict]:
     exps = []
     for f in sorted(experiments_dir.glob('iter_*.json')):
         try:
@@ -69,29 +69,29 @@ def score_breakdown(m: dict) -> str:
 def equity_str(m: dict) -> str:
     eq = m.get('equity_500_final')
     if eq:
-        lucro = eq - 500
-        por_ano = m.get('equity_500_por_ano', {})
-        s = f"€{eq:.0f} ({lucro:+.0f}€)"
-        if por_ano:
-            s += "  [" + "  ".join(f"{yr}→€{v:.0f}" for yr, v in sorted(por_ano.items())) + "]"
+        profit = eq - 500
+        per_year = m.get('equity_500_por_ano', {})
+        s = f"€{eq:.0f} ({profit:+.0f}€)"
+        if per_year:
+            s += "  [" + "  ".join(f"{yr}→€{v:.0f}" for yr, v in sorted(per_year.items())) + "]"
         return s
     ret = m.get('retorno_total_oos_pct') or m.get('retorno_anual_pct', 0)
     if ret:
         eq = 500 * (1 + ret / 100)
-        return f"€{eq:.0f} ({eq-500:+.0f}€)  [retorno total {ret:+.1f}%]"
+        return f"€{eq:.0f} ({eq-500:+.0f}€)  [total return {ret:+.1f}%]"
     return "n/a"
 
 
-def mostrar_tabela(exps: list[dict], top: int, season: int):
+def show_table(exps: list[dict], top: int, season: int):
     if not HAS_RICH:
-        _mostrar_tabela_simples(exps, top, season)
+        _show_table_simple(exps, top, season)
         return
 
     console = Console()
     exps_show = exps[:top]
 
     table = Table(
-        title=f"Melhores Setups — algo_autoresearch S{season}  ({len(exps)} aceites no total)",
+        title=f"Best Setups — algo_autoresearch S{season}  ({len(exps)} accepted in total)",
         box=box.ROUNDED,
         show_lines=True,
         header_style="bold cyan",
@@ -129,16 +129,16 @@ def mostrar_tabela(exps: list[dict], top: int, season: int):
     console.print()
     console.print(table)
 
-    # Score breakdown do melhor
+    # Score breakdown of the best
     if exps_show:
         best = exps_show[0]
         m    = best.get('metricas', {})
-        console.print(f"\n[bold]Score breakdown do melhor (iter {best['iteracao']}):[/bold]")
+        console.print(f"\n[bold]Score breakdown of the best (iter {best['iteracao']}):[/bold]")
         console.print(f"  {score_breakdown(m)}")
 
         ps = best.get('params_snapshot', {})
         if ps:
-            console.print(f"\n[bold]Params do melhor:[/bold]")
+            console.print(f"\n[bold]Params of the best:[/bold]")
             console.print(f"  FEATURES     = {ps.get('FEATURES', '?')}")
             console.print(f"  TIMEFRAMES   = {ps.get('TIMEFRAMES', '?')}")
             console.print(f"  Entry signal : stoch_rsi_k < {ps.get('ENTRY_STOCH_THRESHOLD','?')} AND adx > {ps.get('ENTRY_ADX_THRESHOLD','?')} AND ema_diff > 0")
@@ -153,28 +153,28 @@ def mostrar_tabela(exps: list[dict], top: int, season: int):
                 console.print(f"  Optuna best  : SL={sl_b:.2f}%  TP={tp_b:.2f}%  Threshold={thr_b:.3f}")
             console.print(f"  Bounds       : SL={sl_r}  TP={tp_r}  Thr={thr}")
 
-        # Feature importance se disponível
+        # Feature importance if available
         top_f = m.get('top_features', [])
         bot_f = m.get('bottom_features', [])
         if top_f:
-            console.print(f"\n[bold]Feature importance do melhor:[/bold]")
+            console.print(f"\n[bold]Feature importance of the best:[/bold]")
             console.print(f"  TOP  : {', '.join(f'{f}={v:.3f}' for f,v in top_f[:6])}")
             if bot_f:
-                console.print(f"  FRACAS: {', '.join(f for f,_ in bot_f)}")
+                console.print(f"  WEAK: {', '.join(f for f,_ in bot_f)}")
 
         # Optuna param importance
         oi = m.get('optuna_param_importance', {})
         if oi:
             sorted_oi = sorted(oi.items(), key=lambda x: -x[1])
-            console.print(f"\n[bold]Optuna param importance do melhor:[/bold]")
+            console.print(f"\n[bold]Optuna param importance of the best:[/bold]")
             console.print(f"  {' | '.join(f'{k}={v:.3f}' for k,v in sorted_oi)}")
 
     console.print()
 
 
-def _mostrar_tabela_simples(exps: list[dict], top: int, season: int):
+def _show_table_simple(exps: list[dict], top: int, season: int):
     print(f"\n{'='*90}")
-    print(f"  MELHORES SETUPS — algo_autoresearch S{season}  ({len(exps)} aceites no total)")
+    print(f"  BEST SETUPS — algo_autoresearch S{season}  ({len(exps)} accepted in total)")
     print(f"{'='*90}")
     print(f"  {'#':>3}  {'Iter':>5}  {'Score':>8}  {'Sharpe':>7}  {'Return':>8}  {'DD':>6}  {'Win%':>6}  {'Trades':>7}  Timestamp")
     print(f"  {'-'*80}")
@@ -189,10 +189,10 @@ def _mostrar_tabela_simples(exps: list[dict], top: int, season: int):
     print(f"{'='*90}\n")
 
 
-def mostrar_detalhe(iteracao: int, experiments_dir: Path):
-    f = experiments_dir / f'iter_{iteracao:04d}.json'
+def show_detail(iteration: int, experiments_dir: Path):
+    f = experiments_dir / f'iter_{iteration:04d}.json'
     if not f.exists():
-        print(f"Iteração {iteracao} não encontrada.")
+        print(f"Iteration {iteration} not found.")
         return
 
     e  = json.loads(f.read_text())
@@ -203,15 +203,15 @@ def mostrar_detalhe(iteracao: int, experiments_dir: Path):
         console = Console()
         status_color = {'aceite': 'green', 'rejeitado': 'red', 'erro': 'orange1'}.get(e.get('status'), 'white')
 
-        linhas = [
+        lines = [
             f"[bold]Status:[/bold] [{status_color}]{e.get('status','?')}[/{status_color}]   "
             f"[bold]Timestamp:[/bold] {e.get('timestamp_iso','')}   "
             f"[bold]Commit:[/bold] {e.get('git_commit','')}",
             "",
-            f"[bold green]Score composto:[/bold green] {m.get('score_composto',0):.4f}",
+            f"[bold green]Composite score:[/bold green] {m.get('score_composto',0):.4f}",
             f"  {score_breakdown(m)}",
             "",
-            f"[bold]Métricas:[/bold]",
+            f"[bold]Metrics:[/bold]",
             f"  Sharpe    : {m.get('sharpe_raw',0):.4f}",
             f"  Return    : {m.get('retorno_anual_pct',0):+.2f}%",
             f"  Drawdown  : {abs(m.get('max_drawdown_pct',0)):.2f}%",
@@ -225,25 +225,25 @@ def mostrar_detalhe(iteracao: int, experiments_dir: Path):
         tp_b  = m.get('tp_pct')
         thr_b = m.get('threshold')
         if sl_b:
-            linhas += ["", f"[bold]Optuna best config:[/bold]",
+            lines += ["", f"[bold]Optuna best config:[/bold]",
                        f"  SL={sl_b:.2f}%  TP={tp_b:.2f}%  Threshold={thr_b:.3f}"]
 
         oi = m.get('optuna_param_importance', {})
         if oi:
             sorted_oi = sorted(oi.items(), key=lambda x: -x[1])
-            linhas += ["", f"[bold]Optuna param importance:[/bold]",
+            lines += ["", f"[bold]Optuna param importance:[/bold]",
                        f"  {' | '.join(f'{k}={v:.3f}' for k,v in sorted_oi)}"]
 
         top_f = m.get('top_features', [])
         bot_f = m.get('bottom_features', [])
         if top_f:
-            linhas += ["", "[bold]Feature importance (XGBoost):[/bold]",
+            lines += ["", "[bold]Feature importance (XGBoost):[/bold]",
                        f"  TOP   : {', '.join(f'{f}={v:.3f}' for f,v in top_f)}"]
             if bot_f:
-                linhas.append(f"  FRACAS: {', '.join(f for f,_ in bot_f)}")
+                lines.append(f"  WEAK: {', '.join(f for f,_ in bot_f)}")
 
         if ps:
-            linhas += ["", "[bold]Params snapshot:[/bold]",
+            lines += ["", "[bold]Params snapshot:[/bold]",
                        f"  FEATURES         = {ps.get('FEATURES',[])}",
                        f"  TIMEFRAMES       = {ps.get('TIMEFRAMES',[])}",
                        f"  STOCH_RSI_PERIOD = {ps.get('STOCH_RSI_PERIOD','?')}  ADX_PERIOD={ps.get('ADX_PERIOD','?')}  BB_PERIOD={ps.get('BB_PERIOD','?')}",
@@ -255,18 +255,18 @@ def mostrar_detalhe(iteracao: int, experiments_dir: Path):
                        f"  THRESHOLD_RANGE  = {ps.get('THRESHOLD_RANGE','?')}"]
 
         if e.get('alteracoes_vs_anterior'):
-            linhas += ["", f"[bold]Alterações vs anterior:[/bold]",
+            lines += ["", f"[bold]Changes vs previous:[/bold]",
                        f"  {e['alteracoes_vs_anterior']}"]
 
         if e.get('nota_humana'):
-            linhas += ["", f"[bold]Nota humana:[/bold] {e['nota_humana']}"]
+            lines += ["", f"[bold]Human note:[/bold] {e['nota_humana']}"]
 
         if e.get('tags'):
-            linhas += [f"[bold]Tags:[/bold] {', '.join(e['tags'])}"]
+            lines += [f"[bold]Tags:[/bold] {', '.join(e['tags'])}"]
 
         console.print(Panel(
-            "\n".join(linhas),
-            title=f"[bold cyan]Iteração {iteracao} — Detalhe Completo[/bold cyan]",
+            "\n".join(lines),
+            title=f"[bold cyan]Iteration {iteration} — Full Detail[/bold cyan]",
             border_style="cyan",
         ))
     else:
@@ -274,32 +274,32 @@ def mostrar_detalhe(iteracao: int, experiments_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Apresentar melhores setups do algo_autoresearch')
-    parser.add_argument('--top',    type=int, default=10,  help='Número de melhores a mostrar (default: 10)')
-    parser.add_argument('--all',    action='store_true',   help='Mostrar todos os aceites')
-    parser.add_argument('--full',   type=int, metavar='N', help='Detalhe completo da iteração N')
+    parser = argparse.ArgumentParser(description='Show best setups of algo_autoresearch')
+    parser.add_argument('--top',    type=int, default=10,  help='Number of best to show (default: 10)')
+    parser.add_argument('--all',    action='store_true',   help='Show all accepted')
+    parser.add_argument('--full',   type=int, metavar='N', help='Full detail of iteration N')
     parser.add_argument('--season', '-s', type=int, default=None,
-                        help='Temporada (1=experiments/, 2=experiments_s2/, ...). Default: lido do config.yaml')
+                        help='Season (1=experiments/, 2=experiments_s2/, ...). Default: read from config.yaml')
     args = parser.parse_args()
 
     season = args.season if args.season is not None else _season_from_config()
     experiments_dir = _experiments_dir(season)
 
     if not experiments_dir.exists():
-        print(f"Diretório S{season} não encontrado: {experiments_dir}")
+        print(f"Directory S{season} not found: {experiments_dir}")
         return
 
     if args.full is not None:
-        mostrar_detalhe(args.full, experiments_dir)
+        show_detail(args.full, experiments_dir)
         return
 
-    exps = carregar_aceites(experiments_dir)
+    exps = load_accepted(experiments_dir)
     if not exps:
-        print(f"Nenhuma iteração aceite encontrada em S{season}.")
+        print(f"No accepted iteration found in S{season}.")
         return
 
     top = len(exps) if args.all else args.top
-    mostrar_tabela(exps, top, season)
+    show_table(exps, top, season)
 
 
 if __name__ == '__main__':
