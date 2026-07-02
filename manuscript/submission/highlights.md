@@ -1,7 +1,7 @@
 # Highlights
 
-- A season-structured validation architecture for prescriptive analytics in which an LLM proposes directional candidates and a multi-layer validation system rejects unsound proposals before they reach a passive holdout.
-- Leakage-free feature constraints, AST-based look-ahead detection, layered validation, and a holdout-blind selection protocol reduce the risk of data leakage and overfitting in automated strategy research.
-- 34 333 candidate strategies evaluated across twelve experimental seasons yielded 329 accepted strategies; a selected BNB/USDT case study and a cross-asset BTC/USDC replication both show positive passive-holdout Sharpe ratios.
-- Lightweight ablations indicate that the pipeline's value lies in systematic validation and rejection of unsound candidates rather than in uniquely superior LLM feature selection.
-- The Q1 2026 period was used for production-model selection and is reported only as a noisy post-selection observation; bootstrap p-values and an approximate Deflated Sharpe Ratio are descriptive diagnostics that do not correct for the cross-season meta-search.
+- We let a local LLM propose directional crypto strategies inside experimental "seasons," then run every proposal through syntax checks, AST-based look-ahead detection, catalog compliance, and a passive holdout before accepting it.
+- The feature catalog and validation layers are deliberately leakage-free, so the search is less likely to discover strategies that only look good because they peek at the future.
+- Across 34 333 candidates and twelve seasons, 329 strategies passed all gates. A BNB/USDT case study and a BTC/USDC replication both produced positive Sharpe ratios on holdout data the model never saw during selection.
+- A small ablation suggests the pipeline's edge comes more from rejecting bad candidates systematically than from the LLM picking uniquely good features.
+- We used Q1 2026 only to pick the production model, so those numbers are reported as a noisy post-selection snapshot. The bootstrap p-values and Deflated Sharpe Ratio are descriptive; they do not correct for the broader meta-search across seasons.

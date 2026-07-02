@@ -2,7 +2,7 @@
 
 ## Data Availability Statement
 
-The raw OHLCV data used in this study are publicly available from the Binance public API. The code, experiment logs, trade-level CSVs, generated figures, and reproducibility scripts are available in the repository associated with this submission. A persistent archived snapshot will be deposited upon acceptance (DOI to be assigned). In the interim, the repository can be obtained from the corresponding author on reasonable request.
+The raw OHLCV data come from the public Binance API. The code, experiment logs, trade-level CSVs, figures, and reproducibility scripts are in the repository linked to this submission. We will deposit a persistent archived snapshot if the paper is accepted (DOI to be assigned). Until then, the repository is available from the corresponding author on reasonable request.
 
 To reproduce the two case studies: (1) install the pinned Python environment listed in `requirements.txt`; (2) download 15-minute, 4-hour, and daily OHLCV bars for BNB/USDT and BTC/USDC from the Binance public API; (3) start the local Qwen2.5-7B-Instruct GGUF server via llama.cpp; (4) run `python main.py` for the desired season; (5) for the selected iterations, run `deployment/evaluate_models.py` and `deployment/backtest_deploy.py` using the saved model and parameters in `best_models/season_{N}/iter_{XXXX}/`. A `download_data.py` helper script that performs the exact Binance API calls used in this study is included in the repository. Byte-identical reproduction across operating systems is not guaranteed because of Numba JIT compilation and BLAS threading; the statistical conclusions, however, are robust to the residual non-determinism.
 

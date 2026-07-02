@@ -1,6 +1,6 @@
-# Deployment — Production Models
+# Deployment — production models
 
-## Model 1 — S11 iter 1077 — BNB/USDT — IN PRODUCTION
+## Model 1 — S11 iter 1077 — BNB/USDT — live
 
 **Iter 1077** — Season 11 — BNB/USDT 15m
 
@@ -38,7 +38,7 @@ python deployment/backtest_deploy.py --iter 1077 --season 11 \
     --years 2022 2023 2024 2025 2026
 ```
 
-### Model
+### Model files
 
 ```
 best_models/season_11/iter_1077/
@@ -48,7 +48,7 @@ best_models/season_11/iter_1077/
 
 ---
 
-## Model 2 — S12 iter 5502 — BTC/USDC — DEPLOY CANDIDATE
+## Model 2 — S12 iter 5502 — BTC/USDC — candidate
 
 **Iter 5502** — Season 12 — BTC/USDC 15m
 
@@ -76,9 +76,9 @@ atr_regime_15m, dist_sma200_pct_4h, macd_pct_15m, stoch_rsi_d_1d, ema_diff_4h
 | 2023 | +14.7% | 2.16 | -1.5% | 20 | 90% | €672 |
 | 2024 | +10.7% | 0.94 | -9.3% | 49 | 63% | €744 |
 | **2025 OOS** | **+9.6%** | **1.27** | **-4.5%** | **32** | **66%** | **€816** |
-| **Total** | **+63%** | — | **-9.3%** | **135** | **73%** | **€816** |
+| **Total** | **+63%** | — | **-9.3%** | **135** | **73%** | **816** |
 
-### Evaluated Alternatives (S12)
+### Evaluated alternatives (S12)
 
 | Iter | sv | sh | DD% | Trades | Final capital | Notes |
 |------|----|----|-----|--------|---------------|-------|
@@ -98,7 +98,7 @@ python deployment/backtest_deploy.py --iter 5502 --season 12 \
     --sl 9.70 --tp 9.12 --thr 0.890 --ticker btc --no-compound
 ```
 
-### Model
+### Model files
 
 ```
 best_models/season_12/iter_5502/
@@ -108,11 +108,11 @@ best_models/season_12/iter_5502/
 
 ---
 
-## Cross-Season Comparison
+## Cross-season comparison
 
 | Model | Asset | Final Capital | Total Ret% | OOS Sharpe | Max DD | Trades/year |
 |--------|--------|---------------|------------|------------|--------|------------|
 | **S11 iter 1077** | BNB | — | **+58.2%** | **2.87** | **-6.74%** | ~32 |
 | S12 iter 5502 | BTC | €816 | +63% | 1.27 | -9.3% | ~27 |
 
-S11/BNB shows better OOS Sharpe and lower maximum drawdown; S12/BTC records slightly higher total return in the independent-backtest scenario. BNB displays a microstructure more favourable to mean-reversion than BTC (less institutional/macro noise).
+S11/BNB has the better OOS Sharpe and the smaller drawdown; S12/BTC produced slightly higher total return in the independent-backtest scenario. BNB's price microstructure is more favourable to mean-reversion than BTC's, which carries more institutional and macro noise.

@@ -1,14 +1,14 @@
 # algo-autoresearch-paper
 
-Supporting code, data specification and reproducibility artifacts for the paper *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*.
+Supporting code, data specification, and reproducibility artifacts for *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*.
 
-## What this repo contains
+## What is here
 
 - `autoresearch/` — autonomous LLM-driven strategy generation and validation loop.
-- `pipeline/` — feature engineering, label generation, XGBoost training and Optuna backtest.
+- `pipeline/` — feature engineering, label generation, XGBoost training, and Optuna backtest.
 - `deployment/` — scripts to re-run and stress-test the two accepted case studies.
 - `best_models/` — final accepted models for S11 iter 1077 (BNB/USDT) and S12 iter 5502 (BTC/USDC).
-- `manuscript/submission/` — paper source, figures and tables.
+- `manuscript/submission/` — paper source, figures, and tables.
 - `llm/` — instructions to build llama.cpp and serve the local Qwen2.5-7B-Instruct model.
 
 ## Quick start
@@ -26,7 +26,7 @@ Supporting code, data specification and reproducibility artifacts for the paper 
    pip install -r requirements.txt
    ```
 
-3. Build and start the local LLM server (optional for reproduction of case studies):
+3. Build and start the local LLM server (optional if you only want to reproduce the case studies):
    ```bash
    ./llm/setup.sh
    ./llm/start_server.sh
