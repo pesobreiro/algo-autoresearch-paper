@@ -1,11 +1,11 @@
 """
 deployment/temporal_robustness.py
 
-Computa métricas de robustez temporal para modelos seleccionados em
-janelas alternativas (trimestral, semestral, anual civil e rolling
-12-meses). Os resultados complementam a Secção 4.7 do manuscrito.
+Computes temporal robustness metrics for selected models on
+alternative windows (quarterly, semesterly, calendar year, and rolling
+12-month). Results complement Section 4.7 of the manuscript.
 
-Uso:
+Usage:
     python deployment/temporal_robustness.py
 """
 import sys
@@ -26,14 +26,14 @@ from pipeline.backtest import load_model, simulate_numba
 from ml_sessions_compat.features.technical import merge_timeframes
 
 
-# --- configuração do backtest (igual ao evaluate_models.py) ---
+# --- backtest config (same as evaluate_models.py) ---
 INITIAL_CAPITAL = 500.0
 FEE_PCT         = 0.002
 SLIPPAGE        = 0.001
 ATR_KILL        = 3.0
 MAX_POS         = 5
 
-# Cache de parquets (evita re-leituras desnecessárias)
+# Parquet cache (avoids unnecessary re-reads)
 _PARQUET_CACHE: dict = {}
 
 
@@ -71,7 +71,7 @@ def load_and_prepare_range(
     end: pd.Timestamp,
     exchange: str = 'binance',
 ) -> dict | None:
-    """Carrega dados num intervalo de datas arbitrário e prepara arrays."""
+    """Load data over an arbitrary date range and prepare arrays."""
     df_15m_full = _load_parquet_cached(ticker, '15m', exchange)
     if df_15m_full is None:
         return None
@@ -83,12 +83,12 @@ def load_and_prepare_range(
     if len(df_15m) < 100:
         return None
 
-    # Dados higher-TF: precisamos de alguma história anterior para cálculo de indicadores
+    # Higher-TF data: we need some prior history for indicator calculation
     higher_tf = {}
     for tf_key, tf_code in [('04h', '04h'), ('01d', '01d')]:
         df_full = _load_parquet_cached(ticker, tf_code, exchange)
         if df_full is not None:
-            # Usar desde o início do ano anterior ao start para garantir contexto
+            # Use data from one year before start to ensure context
             cutoff = start - pd.DateOffset(years=1)
             df = df_full[df_full['timestamp'] >= cutoff].sort_values('timestamp').reset_index(drop=True)
             higher_tf[tf_key] = df
@@ -175,7 +175,7 @@ def _semester_windows(years: list):
 
 
 def _rolling_12m_windows(years: list):
-    """Janelas rolling de 12 meses começando em cada ano disponível."""
+    """Rolling 12-month windows starting on each available year."""
     windows = []
     for y in years:
         s = pd.Timestamp(f'{y}-01-01')
@@ -247,15 +247,15 @@ def _summarise(records: list, kind: str) -> dict | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Análise de robustez temporal')
+    parser = argparse.ArgumentParser(description='Temporal robustness analysis')
     parser.add_argument('--out', type=str, default='deployment/results',
-                        help='Diretório de saída')
+                        help='Output directory')
     args = parser.parse_args()
 
     out_dir = BASE_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Modelos dos case studies principais
+    # Main case-study models
     cases = [
         ('season_11', 'iter_1077', 'bnb', list(range(2022, 2027))),
         ('season_12', 'iter_5502', 'btc', list(range(2021, 2026))),
@@ -265,15 +265,15 @@ def main():
     for season, iter_name, ticker, years in cases:
         iter_dir = BASE_DIR / 'best_models' / season / iter_name
         if not iter_dir.exists():
-            print(f'[AVISO] {iter_dir} não encontrado; a ignorar.')
+            print(f'[WARNING] {iter_dir} not found; skipping.')
             continue
 
-        print(f'=== Robustez temporal: {season}/{iter_name} ({ticker}) ===')
+        print(f'=== Temporal robustness: {season}/{iter_name} ({ticker}) ===')
         result = temporal_robustness_for_model(iter_dir, ticker, years)
         all_results.append(result)
 
-        # Resumo por tipo de janela
-        print('\nResumo por tipo de janela:')
+        # Summary by window type
+        print('\nSummary by window type:')
         print(f"{'kind':<15} {'n':>4} {'sh_mean':>8} {'sh_std':>8} {'sh_min':>8} "
               f"{'sh_max':>8} {'pos_frac':>8} {'ret_mean':>9} {'dd_mean':>8} {'trades':>8}")
         print('-' * 100)
@@ -286,18 +286,18 @@ def main():
                   f"{s['sharpe_pos_frac']:>8.2f} {s['ret_mean']:>9.1f} {s['dd_mean']:>8.1f} "
                   f"{s['trades_total']:>8}")
 
-        # Guardar CSV com todos os detalhes
+        # Save CSV with all details
         df = pd.DataFrame(result['records'])
         csv_path = out_dir / f'temporal_robustness_{season}_{iter_name}.csv'
         df.to_csv(csv_path, index=False)
-        print(f'\nDetalhes guardados em: {csv_path}')
+        print(f'\nDetails saved to: {csv_path}')
 
-    # Guardar JSON agregado
+    # Save aggregated JSON
     ts = datetime.now().strftime('%Y%m%d_%H%M')
     json_path = out_dir / f'temporal_robustness_summary_{ts}.json'
     with open(json_path, 'w') as f:
         json.dump(all_results, f, indent=2)
-    print(f'\nResumo JSON guardado em: {json_path}')
+    print(f'\nJSON summary saved to: {json_path}')
 
 
 if __name__ == '__main__':

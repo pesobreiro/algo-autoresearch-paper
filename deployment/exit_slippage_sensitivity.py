@@ -1,11 +1,11 @@
 """
 deployment/exit_slippage_sensitivity.py
 
-Stress-test de slippage nas saídas (stop-loss, take-profit, eoy close)
-para os modelos selecionados S11 iter 1077 e S12 iter 5502.
+Stress-test of slippage on exits (stop-loss, take-profit, and eoy close)
+for selected models S11 iter 1077 and S12 iter 5502.
 
-Mantém a fee de 0.2% round-trip e o slippage de entrada de 0.1%,
-adicionando slippage simétrico nas saídas: 0.0%, 0.1%, 0.2%, 0.3%.
+Keeps the 0.2% round-trip fee and 0.1% entry slippage,
+adding symmetric slippage on exits: 0.0%, 0.1%, 0.2%, 0.3%.
 """
 import sys
 import json
@@ -57,13 +57,13 @@ def simulate_with_exit_slippage(high, low, close, probs, adx,
             exit_price = 0.0
 
             if low[i] <= pos_sl[j]:
-                # Saída por SL com slippage desfavorável (preço pior para posição longa)
+                # SL exit with adverse slippage (worse price for long position)
                 exit_price = pos_sl[j] * (1.0 - exit_slippage)
                 if exit_price <= 0:
                     exit_price = pos_sl[j]
                 exited = True
             elif high[i] >= pos_tp[j]:
-                # Saída por TP com slippage desfavorável (preço pior para posição longa)
+                # TP exit with adverse slippage (worse price for long position)
                 exit_price = pos_tp[j] * (1.0 - exit_slippage)
                 exited = True
                 win = True
@@ -82,9 +82,9 @@ def simulate_with_exit_slippage(high, low, close, probs, adx,
         pos_count = new_count
 
         if pos_count < max_pos and probs[i] >= threshold and adx[i] > adx_min:
-            confianca = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
-            fator = 0.5 + 0.5 * confianca
-            slot_size = (capital / max_pos) * fator
+            confidence = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
+            factor = 0.5 + 0.5 * confidence
+            slot_size = (capital / max_pos) * factor
             if slot_size > 50.0:
                 ep = close[i] * (1.0 + ENTRY_SLIPPAGE)
                 capital -= slot_size
@@ -115,7 +115,7 @@ def simulate_with_exit_slippage(high, low, close, probs, adx,
                 n_days += 1
             day_start_eq = equity_now
 
-    # Fechar posições em aberto no fim com slippage desfavorável
+    # Close open positions at the end with adverse slippage
     for j in range(pos_count):
         e = pos_entry[j]
         sz = pos_size[j]
@@ -171,7 +171,7 @@ def evaluate_case(season, iter_num, sl, tp, thr, ticker, years, label):
                 'year': year, 'ret': ret, 'sharpe': sharpe,
                 'dd': dd, 'trades': trades, 'wr': wr, 'sortino': sortino})
 
-        # Agregar por período: val (exclui holdout), holdout, 2026 se existir
+        # Aggregate by period: val (excludes holdout), holdout, 2026 if it exists
         val_years = [y for y in years if y not in (2025, 2026)]
         holdout_years = [y for y in years if y == 2025]
         oos2026 = [y for y in years if y == 2026]
@@ -213,8 +213,8 @@ def evaluate_case(season, iter_num, sl, tp, thr, ticker, years, label):
 
 
 def main():
-    print("Stress-test de slippage nas saídas")
-    print("Fee: 0.2% round-trip | Slippage entrada: 0.1%")
+    print("Exit slippage stress-test")
+    print("Fee: 0.2% round-trip | Entry slippage: 0.1%")
 
     s11 = evaluate_case(
         season=11, iter_num=1077, sl=7.8, tp=7.1, thr=0.857,
@@ -226,13 +226,13 @@ def main():
         ticker='btc', years=[2021, 2022, 2023, 2024, 2025],
         label='S12 iter 5502 (BTC/USDC)')
 
-    # Guardar resultados
+    # Save results
     out_dir = BASE_DIR / 'deployment/results'
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / 'exit_slippage_sensitivity.json'
     with open(out_path, 'w') as f:
         json.dump({'s11': s11, 's12': s12}, f, indent=2)
-    print(f"\nResultados guardados em: {out_path}")
+    print(f"\nResults saved to: {out_path}")
 
 
 if __name__ == '__main__':

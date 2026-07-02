@@ -1,9 +1,9 @@
 """
 deployment/backtest_deploy.py
 
-Backtest completo com registo de trades individuais para avaliação de deploy.
+Full backtest with individual trade logging for deploy evaluation.
 
-Uso:
+Usage:
     python deployment/backtest_deploy.py
     python deployment/backtest_deploy.py --iter 1077 --sl 6.5 --tp 6.5 --thr 0.857
     python deployment/backtest_deploy.py --years 2025 2026
@@ -33,7 +33,7 @@ INITIAL   = 500.0
 
 
 def load_timestamps(year: int, ticker: str, exchange: str = 'binance') -> pd.Series | None:
-    """Carrega timestamps do parquet 15m para mapear índices → datas."""
+    """Load 15m parquet timestamps to map indices -> dates."""
     fpath = find_parquet(ml_config.DATA_DIR, ticker, '15m', exchange)
     if fpath is None:
         return None
@@ -49,8 +49,8 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
                          initial: float = INITIAL,
                          max_pos: int = MAX_POS) -> tuple[dict, list[dict]]:
     """
-    Simulação Python com registo completo de trades.
-    Retorna (métricas, lista_de_trades).
+    Python simulation with full trade logging.
+    Returns (metrics, trades_list).
     """
     high   = data['high']
     low    = data['low']
@@ -64,7 +64,7 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
     n_wins     = 0
     trades_log = []
 
-    # Posições abertas: lista de dicts
+    # Open positions: list of dicts
     positions  = []
 
     peak    = initial
@@ -81,8 +81,8 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
         return None
 
     for i in range(n):
-        # --- Fechar posições ---
-        # Recolher trades fechados primeiro; equity_after calculado depois de processar todas as posições
+        # --- Close positions ---
+        # Collect closed trades first; equity_after calculated after processing all positions
         still_open    = []
         candle_closed = []
         for pos in positions:
@@ -116,16 +116,16 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
             else:
                 still_open.append(pos)
         positions = still_open
-        # equity_after correcto: capital + todas as posições ainda abertas após este candle
+        # correct equity_after: capital + all positions still open after this candle
         equity_candle = round(capital + sum(p['size'] for p in positions), 2)
         for t in candle_closed:
             trades_log.append({**t, 'equity_after': equity_candle})
 
-        # --- Abrir posição ---
+        # --- Open position ---
         if len(positions) < max_pos and probs[i] >= threshold and adx[i] > adx_min:
-            confianca = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
-            fator     = 0.5 + 0.5 * confianca
-            slot_size = (capital / max_pos) * fator
+            confidence = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
+            factor     = 0.5 + 0.5 * confidence
+            slot_size = (capital / max_pos) * factor
             if slot_size > 50.0:
                 ep = close[i] * (1.0 + SLIPPAGE)
                 capital -= slot_size
@@ -156,7 +156,7 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
                 daily_rets.append((equity_now - day_start_eq) / day_start_eq)
             day_start_eq = equity_now
 
-    # --- Fechar posições em aberto no fim do ano ---
+    # --- Close open positions at year end ---
     ts_last   = timestamps.iloc[-1] if timestamps is not None else None
     eoy_closed = []
     for pos in positions:
@@ -173,12 +173,12 @@ def simulate_with_trades(data: dict, sl_pct: float, tp_pct: float,
             'exit_type':  'EOY',
             'pnl_pct':    round(pnl_pct, 3),
             'pnl_eur':    round(pnl_eur, 4),
-            'equity_after': None,  # preenchido abaixo
+            'equity_after': None,  # filled below
         })
     for t in eoy_closed:
         trades_log.append({**t, 'equity_after': round(capital, 2)})
 
-    # --- Métricas ---
+    # --- Metrics ---
     total_ret = (capital / initial - 1.0) * 100
     sharpe = sortino = 0.0
     if len(daily_rets) > 1:
@@ -213,14 +213,14 @@ def main():
     parser.add_argument('--tp',     type=float, default=6.5)
     parser.add_argument('--thr',    type=float, default=0.857)
     parser.add_argument('--years',      type=int,   nargs='+', default=[2022,2023,2024,2025,2026])
-    parser.add_argument('--max-pos',    type=int,   default=5, help='Máximo de posições simultâneas (1=full capital)')
+    parser.add_argument('--max-pos',    type=int,   default=5, help='Maximum simultaneous positions (1=full capital)')
     parser.add_argument('--out',        type=str,   default='deployment/results')
     parser.add_argument('--ticker',     type=str,   default='bnb', help='Ticker (btc, bnb, eth...)')
-    parser.add_argument('--no-compound', action='store_true', help='Reiniciar €500 em cada ano (desactiva carry-forward)')
+    parser.add_argument('--no-compound', action='store_true', help='Reset €500 each year (disables carry-forward)')
     args = parser.parse_args()
     args.compound = not args.no_compound
 
-    # Carregar modelo
+    # Load model
     iter_dir  = BASE_DIR / f'best_models/season_{args.season}/iter_{args.iter:04d}'
     meta_path = iter_dir / 'meta.json'
     with open(meta_path) as f:
@@ -232,9 +232,9 @@ def main():
     print(f"=== Backtest Deploy — iter {args.iter} S{args.season} ===")
     print(f"SL={args.sl}%  TP={args.tp}%  Threshold={args.thr}  ADX_min={adx_min}")
     max_pos  = args.max_pos
-    mode_str = 'composto (carry-forward)' if args.compound else 'independente (€500/ano)'
-    print(f"Capital inicial: €{INITIAL:.0f}  Fee: {FEE_PCT*100:.1f}%  Max pos: {max_pos}  Modo: {mode_str}")
-    print(f"Anos: {args.years}")
+    mode_str = 'compound (carry-forward)' if args.compound else 'independent (€500/year)'
+    print(f"Initial capital: €{INITIAL:.0f}  Fee: {FEE_PCT*100:.1f}%  Max pos: {max_pos}  Mode: {mode_str}")
+    print(f"Years: {args.years}")
     print()
 
     all_trades = []
@@ -244,7 +244,7 @@ def main():
     for year in args.years:
         data = load_and_prepare(year, model, feature_names, args.ticker)
         if data is None:
-            print(f"  {year}: sem dados")
+            print(f"  {year}: no data")
             continue
         data['probs_safe'] = np.where(data['atr_regime'] > ATR_KILL, 0.0, data['probs'])
         timestamps = load_timestamps(year, args.ticker)
@@ -262,14 +262,14 @@ def main():
             capital = metrics['equity_final']
 
         label = '(val)' if year in [2022,2023,2024] else ('(holdout)' if year==2025 else '(TRUE OOS)')
-        inicio_str = f"  início=€{year_capital:.0f}" if args.compound else ''
+        start_str = f"  start=€{year_capital:.0f}" if args.compound else ''
         print(f"  {year} {label}: Sharpe={metrics['sharpe']:.2f}  Ret={metrics['retorno_pct']:+.1f}%  "
               f"DD={metrics['max_dd_pct']:.1f}%  Trades={metrics['n_trades']}  "
-              f"WR={metrics['win_rate_pct']:.0f}%  Equity=€{metrics['equity_final']:.0f}{inicio_str}")
+              f"WR={metrics['win_rate_pct']:.0f}%  Equity=€{metrics['equity_final']:.0f}{start_str}")
         summary.append({'year': year, 'capital_inicio': year_capital,
                         **{k: v for k, v in metrics.items() if k != 'equity_curve'}})
 
-    # --- CSV de trades ---
+    # --- Trades CSV ---
     out_dir = BASE_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
     ts_str  = datetime.now().strftime('%Y%m%d_%H%M')
@@ -283,37 +283,37 @@ def main():
         w.writeheader()
         w.writerows(all_trades)
 
-    print(f"\n  Trades guardadas em: {csv_path}")
+    print(f"\n  Trades saved to: {csv_path}")
     print(f"  Total trades: {len(all_trades)}")
 
-    # --- Resumo por ano ---
+    # --- Yearly summary ---
     print()
-    inicio_col = '  Início' if args.compound else ''
-    print(f"{'Ano':>5} {'Sharpe':>7} {'Sortino':>8} {'Ret%':>7} {'DD%':>6} "
-          f"{'Trades':>7} {'WR%':>6} {'Equity':>8}{inicio_col}")
+    start_col = '  Start' if args.compound else ''
+    print(f"{'Year':>5} {'Sharpe':>7} {'Sortino':>8} {'Ret%':>7} {'DD%':>6} "
+          f"{'Trades':>7} {'WR%':>6} {'Equity':>8}{start_col}")
     print("-" * (60 + (10 if args.compound else 0)))
     for s in summary:
         label = ' *OOS' if s['year'] >= 2025 else ''
-        inicio_str = f"  €{s['capital_inicio']:>7.0f}" if args.compound else ''
+        start_str = f"  €{s['capital_inicio']:>7.0f}" if args.compound else ''
         print(f"  {s['year']} {s['sharpe']:>7.2f} {s['sortino']:>8.2f} "
               f"{s['retorno_pct']:>+7.1f} {s['max_dd_pct']:>6.1f} "
               f"{s['n_trades']:>7} {s['win_rate_pct']:>6.1f} "
-              f"€{s['equity_final']:>7.0f}{label}{inicio_str}")
+              f"€{s['equity_final']:>7.0f}{label}{start_str}")
 
-    # Total composto ou acumulado OOS
+    # Compound or accumulated OOS total
     if args.compound and summary:
         final = summary[-1]['equity_final']
         total_pct = (final / INITIAL - 1) * 100
         print()
-        print(f"  Capital final ({summary[0]['year']}→{summary[-1]['year']}): "
-              f"€{final:.2f}  ({total_pct:+.1f}%  +€{final-INITIAL:.2f} sobre €{INITIAL:.0f})")
+        print(f"  Final capital ({summary[0]['year']}->{summary[-1]['year']}): "
+              f"€{final:.2f}  ({total_pct:+.1f}%  +€{final-INITIAL:.2f} on €{INITIAL:.0f})")
     else:
         oos = [s for s in summary if s['year'] >= 2025]
         if oos:
             print()
             total_ret_oos = sum(s['retorno_pct'] for s in oos)
-            print(f"  Retorno acumulado 2025+2026: {total_ret_oos:+.1f}%  "
-                  f"(€{INITIAL*(1+total_ret_oos/100):.0f} a partir de €{INITIAL:.0f})")
+            print(f"  Accumulated return 2025+2026: {total_ret_oos:+.1f}%  "
+                  f"(€{INITIAL*(1+total_ret_oos/100):.0f} from €{INITIAL:.0f})")
 
 
 if __name__ == '__main__':

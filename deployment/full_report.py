@@ -1,7 +1,7 @@
 """
 deployment/full_report.py
 
-Full report de todos os modelos aceites com backtest composto full capital (max_pos=1).
+Full report of all accepted models with full-capital compound backtest (max_pos=1).
 """
 import sys
 import json
@@ -71,7 +71,7 @@ def run_model(meta_path: Path) -> dict | None:
 
 
 def main():
-    # Carregar todos os aceites de S11
+    # Load all accepted models from S11
     accepted = []
     for f in sorted(glob.glob(str(BASE_DIR / 'experiments_s11/iter_*.json'))):
         d = json.load(open(f))
@@ -81,8 +81,8 @@ def main():
             if meta_path.exists():
                 accepted.append((it, meta_path))
 
-    print(f'Aceites com modelo guardado: {len(accepted)}')
-    print(f'Capital inicial: €{INITIAL:.0f}  Max pos: {MAX_POS} (full capital)  Composto: sim')
+    print(f'Accepted models with saved model: {len(accepted)}')
+    print(f'Initial capital: €{INITIAL:.0f}  Max pos: {MAX_POS} (full capital)  Compound: yes')
     print()
 
     results = []
@@ -98,7 +98,7 @@ def main():
 
     print()
     print(f'{"="*130}')
-    print(f'  RANKING FINAL — Full Capital Composto — {len(results)} modelos')
+    print(f'  FINAL RANKING — Full Capital Compound — {len(results)} models')
     print(f'{"="*130}')
     print(f'  {"#":>3} {"iter":>6} {"AUC":>7} {"val":>5} {"hld":>5} '
           f'{"SL%":>5} {"TP%":>5} {"Thr":>6}  '
@@ -121,9 +121,9 @@ def main():
         json.dump({'n_models': len(results), 'initial': INITIAL, 'max_pos': MAX_POS,
                    'results': results}, f, indent=2)
     print()
-    print(f'Guardado: {out_path}')
-    print(f'Melhor: iter={results[0]["iter"]}  €{results[0]["capital_final"]:.0f}  {results[0]["ret_total"]:+.1f}%')
-    print(f'Pior:   iter={results[-1]["iter"]}  €{results[-1]["capital_final"]:.0f}  {results[-1]["ret_total"]:+.1f}%')
+    print(f'Saved: {out_path}')
+    print(f'Best: iter={results[0]["iter"]}  €{results[0]["capital_final"]:.0f}  {results[0]["ret_total"]:+.1f}%')
+    print(f'Worst:   iter={results[-1]["iter"]}  €{results[-1]["capital_final"]:.0f}  {results[-1]["ret_total"]:+.1f}%')
 
 
 if __name__ == '__main__':

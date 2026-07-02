@@ -1,12 +1,12 @@
 """
 deployment/sensitivity_fine.py
 
-Análise de sensibilidade fina para iter 1077 — zona óptima:
+Fine sensitivity analysis for iter 1077 — optimal zone:
   SL:        6.0 → 7.0  (step 0.5)
   TP:        6.0 → 7.0  (step 0.5)
-  Threshold: ±1% em torno de 0.857  (step 0.01)
+  Threshold: ±1% around 0.857  (step 0.01)
 
-Métricas por ano (2022-2026) + deploy_score = média Sharpe(2025+2026).
+Metrics per year (2022-2026) + deploy_score = average Sharpe(2025+2026).
 """
 import sys
 import json
@@ -39,18 +39,18 @@ with open(iter_dir / 'meta.json') as f:
 model, feature_names = load_model(iter_dir / 'model')
 adx_min = meta['params']['ENTRY_ADX_THRESHOLD']
 
-# Pré-carregar dados
-print("A carregar dados...", flush=True)
+# Pre-load data
+print("Loading data...", flush=True)
 data_cache = {}
 for year in YEARS:
     d = load_and_prepare(year, model, feature_names, 'bnb')
     if d is not None:
         d['probs_safe'] = np.where(d['atr_regime'] > ATR_KILL, 0.0, d['probs'])
         data_cache[year] = d
-print(f"Anos disponíveis: {list(data_cache.keys())}\n")
+print(f"Available years: {list(data_cache.keys())}\n")
 
 grid = list(product(SL_VALS, TP_VALS, THR_VALS))
-print(f"Grid: {len(SL_VALS)} SL × {len(TP_VALS)} TP × {len(THR_VALS)} Thr = {len(grid)} combinações")
+print(f"Grid: {len(SL_VALS)} SL × {len(TP_VALS)} TP × {len(THR_VALS)} Thr = {len(grid)} combinations")
 print(f"SL:  {SL_VALS}")
 print(f"TP:  {TP_VALS}")
 print(f"Thr: {THR_VALS}")
@@ -86,7 +86,7 @@ for sl, tp, thr in grid:
 
 results.sort(key=lambda x: -x['deploy_score'])
 
-# Tabela
+# Table
 print(f"{'SL':>5} {'TP':>5} {'Thr':>6}  {'deploy':>7} {'val':>6} {'2025':>6} {'2026':>6} {'minS':>6}  "
       f"{'2022ret':>7} {'2023ret':>7} {'2024ret':>7} {'2025ret':>7} {'2026ret':>7}")
 print("-" * 100)
@@ -102,12 +102,12 @@ for r in results:
 
 print()
 best = results[0]
-print(f"=== MELHOR COMBINAÇÃO ===")
+print(f"=== BEST COMBINATION ===")
 print(f"SL={best['sl']}%  TP={best['tp']}%  Thr={best['thr']}  deploy_score={best['deploy_score']}")
 print(f"Sharpe val={best['sharpe_val']}  2025={best['sharpe_2025']}  2026={best['sharpe_2026']}  min={best['min_sharpe']}")
 
-# Referência: params originais
+# Reference: original params
 ref = next((r for r in results if r['sl']==7.8 and r['tp']==7.1 and r['thr']==0.857), None)
 if not ref:
-    # mostrar o mais próximo
-    print(f"\n(Params originais SL=7.8/TP=7.1/Thr=0.857 fora do grid desta análise)")
+    # show the closest one
+    print(f"\n(Original params SL=7.8/TP=7.1/Thr=0.857 outside this analysis grid)")

@@ -1,14 +1,14 @@
 """
 deployment/evaluate_models.py
 
-Avalia os melhores modelos aceites para decisão de deploy.
+Evaluate the best accepted models for deploy decision.
 
-Para cada modelo seleccionado:
-  - Re-corre simulação com SL/TP/Threshold FIXOS (sem Optuna)
-  - Anos avaliados: 2022, 2023, 2024 (val), 2025 (holdout), 2026 (true OOS)
-  - 2026 = dados que nenhum modelo viu durante treino/optimização
+For each selected model:
+  - Re-runs simulation with FIXED SL/TP/Threshold (no Optuna)
+  - Evaluated years: 2022, 2023, 2024 (val), 2025 (holdout), 2026 (true OOS)
+  - 2026 = data no model saw during training/optimization
 
-Uso:
+Usage:
     python deployment/evaluate_models.py
     python deployment/evaluate_models.py --season 11 --top 30
     python deployment/evaluate_models.py --season 11 --top 50 --min-holdout 1.5
@@ -71,7 +71,7 @@ def evaluate_model(iter_dir: Path, meta: dict) -> dict | None:
     try:
         model, feature_names = load_model(model_dir)
     except Exception as e:
-        print(f"  [ERRO] {iter_dir.name}: {e}")
+        print(f"  [ERROR] {iter_dir.name}: {e}")
         return None
 
     m       = meta['metricas']
@@ -86,7 +86,7 @@ def evaluate_model(iter_dir: Path, meta: dict) -> dict | None:
         r = _run_year(model, feature_names, year, sl, tp, thr, adx_min)
         years_results[year] = r
 
-    # Métricas agregadas
+    # Aggregated metrics
     val_sharpes   = [years_results[y]['sharpe']      for y in VAL_YEARS   if years_results.get(y)]
     holdout       = years_results.get(HOLDOUT_YR)
     true_oos      = years_results.get(TRUE_OOS_YR)
@@ -96,7 +96,7 @@ def evaluate_model(iter_dir: Path, meta: dict) -> dict | None:
     sharpe_2026     = true_oos['sharpe']  if true_oos else None
     ret_2026        = true_oos['retorno_pct'] if true_oos else None
 
-    # Score de deploy: média de holdout + 2026 (ambos nunca otimizados)
+    # Deploy score: average of holdout + 2026 (both never optimized)
     oos_scores = [s for s in [sharpe_holdout, sharpe_2026] if s is not None]
     deploy_score = round(np.mean(oos_scores), 3) if oos_scores else 0.0
 
@@ -104,12 +104,12 @@ def evaluate_model(iter_dir: Path, meta: dict) -> dict | None:
         'iter':          meta['iteracao'],
         'season':        meta.get('season', '?'),
         'auc':           round(m['cv_auc_mean'], 4),
-        'sharpe_val':    round(m['sharpe_validation'], 3),  # original (do Optuna)
-        'sharpe_val_rerun':   sharpe_val_mean,              # re-calculado aqui
+        'sharpe_val':    round(m['sharpe_validation'], 3),  # original (from Optuna)
+        'sharpe_val_rerun':   sharpe_val_mean,              # re-calculated here
         'sharpe_holdout':     sharpe_holdout,               # 2025
         'sharpe_2026':        sharpe_2026,                  # true OOS
         'ret_2026_pct':       ret_2026,
-        'deploy_score':       deploy_score,                 # média (holdout + 2026)
+        'deploy_score':       deploy_score,                 # average (holdout + 2026)
         'sl_pct':        round(sl, 2),
         'tp_pct':        round(tp, 2),
         'threshold':     round(thr, 3),
@@ -120,7 +120,7 @@ def evaluate_model(iter_dir: Path, meta: dict) -> dict | None:
 
 
 def load_candidates(season_dir: Path, top: int, min_holdout: float) -> list[dict]:
-    """Carrega e filtra modelos por Sharpe(holdout) do meta.json."""
+    """Load and filter models by Sharpe(holdout) from meta.json."""
     candidates = []
     for iter_dir in sorted(season_dir.iterdir()):
         meta_path = iter_dir / 'meta.json'
@@ -151,28 +151,28 @@ def print_table(results: list[dict]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Avalia modelos para deploy')
+    parser = argparse.ArgumentParser(description='Evaluate models for deploy')
     parser.add_argument('--season',      type=int,   default=11)
-    parser.add_argument('--top',         type=int,   default=30,  help='Top N por holdout')
-    parser.add_argument('--min-holdout', type=float, default=1.0, help='Sharpe holdout mínimo')
+    parser.add_argument('--top',         type=int,   default=30,  help='Top N by holdout')
+    parser.add_argument('--min-holdout', type=float, default=1.0, help='Minimum holdout Sharpe')
     parser.add_argument('--out',         type=str,   default='deployment/results')
     args = parser.parse_args()
 
     season_dir = BASE_DIR / f'best_models/season_{args.season}'
     if not season_dir.exists():
-        print(f"ERRO: {season_dir} não existe")
+        print(f"ERROR: {season_dir} does not exist")
         sys.exit(1)
 
     out_dir = BASE_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"=== Avaliação de Deploy — Season {args.season} ===")
-    print(f"Top {args.top} por Sharpe(holdout) ≥ {args.min_holdout}")
-    print(f"Anos: {EVAL_YEARS} | 2026 = True OOS")
+    print(f"=== Deploy Evaluation — Season {args.season} ===")
+    print(f"Top {args.top} by Sharpe(holdout) ≥ {args.min_holdout}")
+    print(f"Years: {EVAL_YEARS} | 2026 = True OOS")
     print()
 
     candidates = load_candidates(season_dir, args.top, args.min_holdout)
-    print(f"Candidatos encontrados: {len(candidates)}")
+    print(f"Candidates found: {len(candidates)}")
     print()
 
     results = []
@@ -189,21 +189,21 @@ def main():
             print(f"→ 2026={sh26:.2f}  deploy_score={r['deploy_score']:.3f}")
             results.append(r)
         else:
-            print("→ ERRO")
+            print("→ ERROR")
 
     print_table(results)
 
-    # Salvar resultados
+    # Save results
     ts = datetime.now().strftime('%Y%m%d_%H%M')
     out_path = out_dir / f'evaluation_s{args.season}_{ts}.json'
     with open(out_path, 'w') as f:
         json.dump({'season': args.season, 'timestamp': ts,
                    'results': sorted(results, key=lambda x: -(x['deploy_score'] or 0))}, f, indent=2)
-    print(f"\nResultados guardados em: {out_path}")
+    print(f"\nResults saved to: {out_path}")
 
     # Top 5
     top5 = sorted(results, key=lambda x: -(x['deploy_score'] or 0))[:5]
-    print("\n=== TOP 5 CANDIDATOS DEPLOY ===")
+    print("\n=== TOP 5 DEPLOY CANDIDATES ===")
     for r in top5:
         sh26 = r['sharpe_2026']
         eq_2026 = r['by_year'].get('2026', {})
