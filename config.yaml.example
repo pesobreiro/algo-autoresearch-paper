@@ -1,0 +1,41 @@
+# algo_autoresearch — configuração principal
+# Copiar para config.yaml e preencher
+
+llm:
+  server_url: "http://localhost:8080"
+  model: "qwen2.5-7b"
+  model_path: "~/models/gguf/qwen2.5-7b-instruct-q4_k_m.gguf"
+  max_tokens: 2048
+  temperature: 0.7        # temperatura base
+  timeout_seconds: 120
+  # Temperature curriculum (annealing automático)
+  t_min: 0.3              # mínimo (exploit)
+  t_max: 1.2              # máximo (explore)
+  t_decay: 0.92           # multiplicador quando score melhora
+  t_grow: 1.08            # multiplicador quando score estagna
+  stagnation_threshold: 5 # iterações sem melhoria antes de subir temperatura
+
+pipeline:
+  ticker: "bnb"          # ou "btc", "eth"
+  exchange: "binance"    # ou "gateio"
+  data_dir: "~/crypto_data"
+  output_dir: "data/"
+  cache_dir: "cache/"
+  backtest_years: [2025, 2026]
+  train_start: 2017
+  train_end: 2024
+  max_positions: 5
+
+scoring:
+  sharpe_weight: 0.50
+  return_weight: 0.30
+  drawdown_weight: 0.20
+  min_trades: 10
+
+agent:
+  season: 2              # temporada atual (1=experiments/, 2=experiments_s2/, ...)
+  max_iterations: 0      # 0 = infinito
+  accept_threshold: 0.01 # melhorar score em pelo menos 1%
+  revert_on_worse: true
+  human_review_interval: 5  # pedir revisão a cada N iterações
+  baseline_override: 0.5607 # score mínimo para aceitar (útil ao iniciar nova temporada)
