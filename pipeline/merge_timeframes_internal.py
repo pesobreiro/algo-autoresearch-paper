@@ -1,8 +1,8 @@
 """
 Internal copy of the external feature-merge module for reproducibility and audit.
 
-Imported at runtime by pipeline/backtest.py and pipeline/generate_labels.py as
-`features.technical.merge_timeframes`. This file preserves the same causal logic:
+Imported at runtime by pipeline/backtest.py and pipeline/generate_labels.py via
+`ml_sessions_compat.features.technical.merge_timeframes`. This file preserves the same causal logic:
 - CANDLE_OFFSETS shifts higher-timeframe timestamps from open to close (RULE 2).
 - merge_asof(..., direction='backward') propagates each higher-timeframe value
   only to 15-minute bars at or after the corresponding close (RULE 3).

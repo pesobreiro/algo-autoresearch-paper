@@ -4,9 +4,6 @@ Treino do modelo XGBoost para o pipeline algo_autoresearch.
 Adaptado de btc_only_repro/04_train.py para ler hiperparâmetros
 de research_params.py.
 """
-import sys
-import os
-
 import pandas as pd
 import numpy as np
 import joblib
