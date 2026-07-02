@@ -30,6 +30,14 @@ llm/llama.cpp/
 *.safetensors
 
 # ML / trading model artifacts
+models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# Case-study models (allowed despite generic ignores)
 best_models/**
 !best_models/season_11/
 !best_models/season_11/iter_1077/
@@ -37,12 +45,6 @@ best_models/**
 !best_models/season_12/
 !best_models/season_12/iter_5502/
 !best_models/season_12/iter_5502/**
-models/
-*.pkl
-*.joblib
-*.pt
-*.pth
-*.onnx
 
 # Experiment directories
 experiments*/
