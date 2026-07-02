@@ -1,8 +1,8 @@
 """
-Treino do modelo XGBoost para o pipeline algo_autoresearch.
+XGBoost model training for the algo_autoresearch pipeline.
 
-Adaptado de btc_only_repro/04_train.py para ler hiperparâmetros
-de research_params.py.
+Adapted from btc_only_repro/04_train.py to read hyperparameters
+from research_params.py.
 """
 import pandas as pd
 import numpy as np
@@ -41,7 +41,7 @@ def walk_forward_validation(X, y, params, sample_weight=None, n_splits=5) -> lis
 
 def _xgb_optuna_study(X, y, base_params: dict, xgb_ranges: dict,
                       sample_weight, n_trials: int) -> dict:
-    """Estudo Optuna para hiperparâmetros XGBoost. Retorna o melhor dict de params."""
+    """Optuna study for XGBoost hyperparameters. Returns the best parameter dict."""
 
     def objective(trial):
         p = base_params.copy()
@@ -72,26 +72,26 @@ def _xgb_optuna_study(X, y, base_params: dict, xgb_ranges: dict,
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
     best = study.best_params
 
-    # Fundir com base_params
+    # Merge with base_params
     result = base_params.copy()
     result.update(best)
     return result, study.best_value
 
 
-def treinar_modelo(config: dict, params: dict, data_path: Path,
-                   model_dir: Path, feature_cols: list = None) -> dict:
+def train_model(config: dict, params: dict, data_path: Path,
+                model_dir: Path, feature_cols: list = None) -> dict:
     """
-    Treina modelo XGBoost com hiperparâmetros de research_params.py.
+    Train an XGBoost model with hyperparameters from research_params.py.
 
     Args:
-        config: configuração do sistema
-        params: parâmetros do research_params.py
-        data_path: path ao parquet de labels
-        model_dir: directório onde guardar o modelo
-        feature_cols: lista de colunas (se None, detecta automaticamente)
+        config: system configuration
+        params: parameters from research_params.py
+        data_path: path to the labels parquet
+        model_dir: directory where the model will be saved
+        feature_cols: list of columns (if None, auto-detected)
 
     Returns:
-        dict com métricas de treino
+        dict with training metrics
     """
     xgb_params = {
         'n_estimators':     params['N_ESTIMATORS'],
@@ -109,41 +109,41 @@ def treinar_modelo(config: dict, params: dict, data_path: Path,
     }
 
     print(f"\n{'='*70}")
-    print(f"TREINO DO MODELO")
+    print(f"MODEL TRAINING")
     print(f"  XGBoost: n_est={xgb_params['n_estimators']}, depth={xgb_params['max_depth']}, "
           f"lr={xgb_params['learning_rate']}")
     print(f"{'='*70}")
 
-    print(f"  A carregar: {data_path}")
+    print(f"  Loading: {data_path}")
     df = pd.read_parquet(data_path)
     df = df.sort_values('timestamp').reset_index(drop=True)
 
     if feature_cols is None:
         feature_cols = get_feature_columns(df)
 
-    # Usar apenas colunas que existem no dataframe
+    # Use only columns that exist in the dataframe
     feature_cols = [c for c in feature_cols if c in df.columns]
 
-    print(f"  Amostras: {len(df):,} | Features: {len(feature_cols)}")
-    print(f"  Positivos: {df['label'].mean()*100:.1f}%")
+    print(f"  Samples: {len(df):,} | Features: {len(feature_cols)}")
+    print(f"  Positives: {df['label'].mean()*100:.1f}%")
 
     X = df[feature_cols].ffill().fillna(0).values
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     y = df['label'].values
 
-    # Sample weights: penaliza mais os erros em trades de maior magnitude PnL
-    # Trades com pnl_pct alto (ganhos grandes ou perdas grandes) recebem mais peso
+    # Sample weights: penalize errors more on trades with larger PnL magnitude
+    # Trades with high pnl_pct (large gains or losses) receive more weight
     if 'pnl_pct' in df.columns:
         raw_w = df['pnl_pct'].abs().fillna(0).values
-        # Normalizar para média=1 (não altera escala absoluta do loss)
+        # Normalize to mean=1 (does not change absolute loss scale)
         mean_w = raw_w.mean()
         sample_weight = raw_w / (mean_w + 1e-9) if mean_w > 0 else np.ones(len(df))
         print(f"  Sample weights: pnl_pct magnitude (min={raw_w.min():.2f}% max={raw_w.max():.2f}% mean={mean_w:.2f}%)")
     else:
         sample_weight = np.ones(len(df))
-        print("  Sample weights: uniformes (pnl_pct não disponível)")
+        print("  Sample weights: uniform (pnl_pct not available)")
 
-    # Optuna XGBoost: ativo se o LLM definir ranges em vez de valores fixos
+    # Optuna XGBoost: active if the LLM defines ranges instead of fixed values
     xgb_ranges = {k: params[k] for k in
                   ('DEPTH_RANGE', 'LR_RANGE', 'ESTIMATORS_RANGE', 'ALPHA_RANGE', 'LAMBDA_RANGE')
                   if params.get(k) is not None}
@@ -161,9 +161,9 @@ def treinar_modelo(config: dict, params: dict, data_path: Path,
     print("\n  Walk-forward CV (5 folds)...")
     start = datetime.now()
     cv_aucs = walk_forward_validation(X, y, xgb_params, sample_weight=sample_weight)
-    print(f"  AUC médio: {np.mean(cv_aucs):.4f} ± {np.std(cv_aucs):.4f}")
+    print(f"  Average AUC: {np.mean(cv_aucs):.4f} ± {np.std(cv_aucs):.4f}")
 
-    print(f"\n  Treino final em {len(df):,} amostras...")
+    print(f"\n  Final training on {len(df):,} samples...")
     final_model = XGBClassifier(**xgb_params)
     final_model.fit(X, y, sample_weight=sample_weight)
 
@@ -177,7 +177,7 @@ def treinar_modelo(config: dict, params: dict, data_path: Path,
 
     elapsed = (datetime.now() - start).total_seconds()
 
-    # Feature importance ordenada
+    # Sorted feature importance
     importances = dict(zip(feature_cols, final_model.feature_importances_))
     sorted_imp = sorted(importances.items(), key=lambda x: -x[1])
     top_features    = [(f, round(float(v), 4)) for f, v in sorted_imp[:8]]
@@ -185,7 +185,9 @@ def treinar_modelo(config: dict, params: dict, data_path: Path,
 
     print(f"\n  Top features: {', '.join(f'{f}={v:.3f}' for f,v in top_features[:5])}")
     if bottom_features:
-        print(f"  Features fracas (<0.02): {', '.join(f for f,_ in bottom_features)}")
+        print(f"  Weak features (<0.02): {', '.join(f for f,_ in bottom_features)}")
+
+    train_duration_seconds = elapsed
 
     stats = {
         'n_samples':       len(df),
@@ -197,8 +199,12 @@ def treinar_modelo(config: dict, params: dict, data_path: Path,
         'feature_cols': feature_cols,
         'top_features':    top_features,
         'bottom_features': bottom_features,
-        'duracao_treino_segundos': elapsed,
+        'duracao_treino_segundos': train_duration_seconds,
     }
 
-    print(f"  Modelo guardado: {model_path}")
+    print(f"  Model saved: {model_path}")
     return stats
+
+
+# Backward-compatible alias for external callers
+treinar_modelo = train_model

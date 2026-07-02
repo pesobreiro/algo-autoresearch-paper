@@ -1,9 +1,9 @@
 """
-Backtest com Otimização Bayesiana (Optuna) para o pipeline algo_autoresearch.
+Backtest with Bayesian Optimization (Optuna) for the algo_autoresearch pipeline.
 
-Em vez de grid estático SL/TP/threshold, usa TPE Sampler para explorar
-o espaço de forma inteligente. Penaliza configs inconsistentes entre anos
-(degradation ratio) para evitar overfitting ao período de treino.
+Instead of a static SL/TP/threshold grid, uses TPE Sampler to explore
+the space intelligently. Penalizes configs with inconsistent degradation
+between years to avoid overfitting the training period.
 """
 import sys
 from pathlib import Path
@@ -24,9 +24,9 @@ from numba import njit
 import ml_sessions_compat.config as ml_config
 from ml_sessions_compat.features.technical import merge_timeframes
 
-# --- Cache module-level de parquets (mitigação OOM S8) ---
-# Cada entrada: (ticker, exchange, tf) → DataFrame completo
-# Evita re-leitura do disco e acumulação de RSS a cada iteração
+# --- Module-level parquet cache (OOM mitigation S8) ---
+# Each entry: (ticker, exchange, tf) → full DataFrame
+# Avoids re-reading from disk and RSS accumulation at each iteration
 _PARQUET_CACHE: dict = {}
 
 
@@ -46,7 +46,7 @@ def find_parquet(data_dir: str, ticker: str, tf: str, exchange: str = 'binance')
 def load_model(model_dir: Path):
     model_path = model_dir / 'xgboost_best.joblib'
     if not model_path.exists():
-        raise FileNotFoundError(f"Modelo não encontrado: {model_path}. Correr train.py primeiro.")
+        raise FileNotFoundError(f"Model not found: {model_path}. Run train.py first.")
     model = joblib.load(model_path)
     feature_path = model_dir / 'feature_names.txt'
     with open(feature_path) as f:
@@ -55,7 +55,7 @@ def load_model(model_dir: Path):
 
 
 def _load_parquet_cached(data_dir: str, ticker: str, tf: str, exchange: str) -> pd.DataFrame | None:
-    """Lê parquet do disco apenas uma vez por processo; reutiliza de cache nas iterações seguintes."""
+    """Read parquet from disk only once per process; reuse from cache in subsequent iterations."""
     key = (ticker, exchange, tf)
     if key not in _PARQUET_CACHE:
         fpath = find_parquet(data_dir, ticker, tf, exchange)
@@ -131,7 +131,7 @@ def simulate_numba(high, low, close, probs, adx,
     day_start_eq       = initial
     daily_sum          = 0.0
     daily_sq_sum       = 0.0
-    downside_sq_sum    = 0.0   # soma dos quadrados dos retornos diários negativos
+    downside_sq_sum    = 0.0   # sum of squared negative daily returns
     n_days             = 0
 
     peak   = initial
@@ -157,11 +157,11 @@ def simulate_numba(high, low, close, probs, adx,
         pos_count = new_count
 
         if pos_count < max_pos and probs[i] >= threshold and adx[i] > adx_min:
-            # Dynamic sizing: escala entre 50% e 100% da slot base
-            # conforme a confiança do modelo acima do threshold
-            confianca   = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
-            fator       = 0.5 + 0.5 * confianca   # [0.50, 1.00]
-            slot_size   = (capital / max_pos) * fator
+            # Dynamic sizing: scale between 50% and 100% of the base slot
+            # according to model confidence above the threshold
+            confidence  = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
+            factor      = 0.5 + 0.5 * confidence   # [0.50, 1.00]
+            slot_size   = (capital / max_pos) * factor
             if slot_size > 50.0:
                 ep = close[i] * (1.0 + slippage)
                 capital -= slot_size
@@ -216,7 +216,7 @@ def simulate_numba(high, low, close, probs, adx,
 def simulate_numba_equity(high, low, close, probs, adx,
                           sl_pct, tp_pct, threshold, adx_min,
                           initial=10_000.0, slippage=0.001, max_pos=1, fee_pct=0.001):
-    """Igual a simulate_numba mas também retorna equity curve e índices do max drawdown."""
+    """Same as simulate_numba but also returns equity curve and max drawdown indices."""
     capital  = initial
     n_trades = 0
     n_wins   = 0
@@ -263,9 +263,9 @@ def simulate_numba_equity(high, low, close, probs, adx,
         pos_count = new_count
 
         if pos_count < max_pos and probs[i] >= threshold and adx[i] > adx_min:
-            confianca = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
-            fator     = 0.5 + 0.5 * confianca
-            slot_size = (capital / max_pos) * fator
+            confidence = (probs[i] - threshold) / (1.0 - threshold + 1e-9)
+            factor     = 0.5 + 0.5 * confidence
+            slot_size = (capital / max_pos) * factor
             if slot_size > 50.0:
                 ep = close[i] * (1.0 + slippage)
                 capital -= slot_size
@@ -320,28 +320,28 @@ def simulate_numba_equity(high, low, close, probs, adx,
     return total_ret, sharpe_raw, max_dd * 100.0, n_trades, win_rate, sortino_raw, equity, dd_start, dd_end
 
 
-def calcular_score(sharpe: float, retorno_pct: float, drawdown_pct: float,
-                   weights: dict = None) -> float:
+def calculate_score(sharpe: float, return_pct: float, drawdown_pct: float,
+                    weights: dict = None) -> float:
     """
-    Score composto: tanh(S/2)*0.50 + tanh(R/100)*0.30 - (abs(DD)/100)*0.20
+    Composite score: tanh(S/2)*0.50 + tanh(R/100)*0.30 - (abs(DD)/100)*0.20
     """
     if weights is None:
         weights = {'sharpe': 0.50, 'return': 0.30, 'drawdown': 0.20}
 
     s = float(np.tanh(sharpe / 2)) * weights['sharpe']
-    r = float(np.tanh(retorno_pct / 100)) * weights['return']
+    r = float(np.tanh(return_pct / 100)) * weights['return']
     d = (abs(drawdown_pct) / 100) * weights['drawdown']
     return s + r - d
 
 
-def correr_backtest(config: dict, params: dict, model_dir: Path,
-                    objective_mode: str = 'score') -> dict:
+def run_backtest(config: dict, params: dict, model_dir: Path,
+                 objective_mode: str = 'score') -> dict:
     """
-    Backtest com Otimização Bayesiana (Optuna).
+    Backtest with Bayesian Optimization (Optuna).
 
-    Cada trial testa um (SL, TP, threshold) sugerido pelo TPE Sampler.
-    objective_mode='score': maximizar score_composto médio entre anos OOS (S1-S4).
-    objective_mode='profit': maximizar retorno % médio OOS diretamente (S5+).
+    Each trial tests an (SL, TP, threshold) suggested by the TPE Sampler.
+    objective_mode='score': maximize average composite score over OOS years (S1-S4).
+    objective_mode='profit': maximize average OOS return % directly (S5+).
     """
     ticker           = config['pipeline']['ticker']
     exchange         = config['pipeline'].get('exchange', 'binance')
@@ -358,52 +358,52 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
     max_dd_gate       = w.get('max_dd_gate', -30.0)
     min_sharpe_gate   = w.get('min_sharpe_gate', 0.5)
     min_trades_profit = w.get('min_trades_profit', min_trades)
-    atr_kill          = w.get('atr_regime_kill', float('inf'))  # kill-switch: zera probs se atr_regime > limite
+    atr_kill          = w.get('atr_regime_kill', float('inf'))  # kill-switch: zero probs if atr_regime > limit
     n_trials    = params.get('N_TRIALS', 120)
     sl_range    = params.get('SL_RANGE', (0.5, 12.0))
     tp_range    = params.get('TP_RANGE', (1.0, 40.0))
     thr_range   = params.get('THRESHOLD_RANGE', (0.30, 0.80))
 
     print(f"\n{'='*70}")
-    print(f"BACKTEST (Optuna TPE) — {ticker.upper()}  [modo: {objective_mode.upper()}]")
-    print(f"  Optuna valida: {validation_years} | True holdout (passivo): {holdout_years} | Trials: {n_trials}")
+    print(f"BACKTEST (Optuna TPE) — {ticker.upper()}  [mode: {objective_mode.upper()}]")
+    print(f"  Optuna validation: {validation_years} | True holdout (passive): {holdout_years} | Trials: {n_trials}")
     print(f"  SL: {sl_range} | TP: {tp_range} | Thr: {thr_range} | Max pos: {max_pos}")
     print(f"{'='*70}")
 
     model, feature_names = load_model(model_dir)
     print(f"  Features: {len(feature_names)}")
 
-    # Compilar Numba
-    print("  A compilar Numba...", end='', flush=True)
+    # Compile Numba
+    print("  Compiling Numba...", end='', flush=True)
     _d = np.ones(10, dtype=np.float64)
     simulate_numba(_d, _d * 0.99, _d, _d * 0.5, _d * 30.0, 1.0, 2.0, 0.5, 0.0, max_pos=max_pos)
-    print(" pronto")
+    print(" done")
 
-    # Carregar dados de validação (para Optuna)
-    print("  A carregar dados validação...", end='', flush=True)
-    data_por_ano_val = {}
+    # Load validation data (for Optuna)
+    print("  Loading validation data...", end='', flush=True)
+    data_by_year_val = {}
     for year in validation_years:
         data = load_and_prepare(year, model, feature_names, ticker, exchange)
         if data is not None:
-            data_por_ano_val[year] = data
+            data_by_year_val[year] = data
             print(f" {year}({data['n']} bars)", end='', flush=True)
         else:
             print(f" {year}(SKIP)", end='', flush=True)
     print()
 
-    # Carregar dados holdout (passivo — Optuna nunca toca)
-    print("  A carregar dados holdout (passivo)...", end='', flush=True)
-    data_por_ano_holdout = {}
+    # Load holdout data (passive — Optuna never touches it)
+    print("  Loading holdout data (passive)...", end='', flush=True)
+    data_by_year_holdout = {}
     for year in holdout_years:
         data = load_and_prepare(year, model, feature_names, ticker, exchange)
         if data is not None:
-            data_por_ano_holdout[year] = data
+            data_by_year_holdout[year] = data
             print(f" {year}({data['n']} bars)", end='', flush=True)
         else:
             print(f" {year}(SKIP)", end='', flush=True)
     print()
 
-    if not data_por_ano_val:
+    if not data_by_year_val:
         return {
             'sharpe_raw': 0.0, 'retorno_anual_pct': 0.0,
             'max_drawdown_pct': 100.0, 'win_rate_pct': 0.0,
@@ -420,9 +420,9 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
         thr = trial.suggest_float('threshold', thr_range[0], thr_range[1])
 
         if objective_mode == 'profit':
-            # --- modo profit: maximizar retorno % médio (anos de validação apenas) ---
-            retorno_acumulado = 0.0
-            for year, data in data_por_ano_val.items():
+            # --- profit mode: maximize average return % (validation years only) ---
+            return_accumulated = 0.0
+            for year, data in data_by_year_val.items():
                 probs_safe = np.where(data['atr_regime'] > atr_kill, 0.0, data['probs'])
                 ret, sharpe, max_dd, n_trades, _, _sortino = simulate_numba(
                     data['high'], data['low'], data['close'],
@@ -435,17 +435,17 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
                     return -999.0
                 if sharpe < min_sharpe_gate:
                     return -999.0
-                retorno_acumulado += ret
-            if not data_por_ano_val:
+                return_accumulated += ret
+            if not data_by_year_val:
                 return -999.0
-            return retorno_acumulado / len(data_por_ano_val)
+            return return_accumulated / len(data_by_year_val)
 
         else:
-            # --- modo score: maximizar pior sub-janela (robustez anti-overfitting) ---
-            # Maximizar min(sharpe) em vez de mean(sharpe): penaliza configs que
-            # se saem bem num ano de validação mas colapsam no outro.
+            # --- score mode: maximize worst sub-window (anti-overfitting robustness) ---
+            # Maximize min(sharpe) instead of mean(sharpe): penalizes configs that
+            # perform well in one validation year but collapse in the other.
             sharpes_val = []
-            for year, data in data_por_ano_val.items():
+            for year, data in data_by_year_val.items():
                 probs_safe = np.where(data['atr_regime'] > atr_kill, 0.0, data['probs'])
                 ret, sharpe, max_dd, n_trades, _, _sortino = simulate_numba(
                     data['high'], data['low'], data['close'],
@@ -459,9 +459,9 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
             if not sharpes_val:
                 return -1.0
 
-            return float(min(sharpes_val))  # pior sub-janela
+            return float(min(sharpes_val))  # worst sub-window
 
-    # Criar e optimizar estudo Optuna
+    # Create and optimize Optuna study
     study = optuna.create_study(
         direction='maximize',
         sampler=optuna.samplers.TPESampler(seed=42, n_startup_trials=20),
@@ -475,15 +475,15 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
     tp_b   = best['tp_pct']
     thr_b  = best['threshold']
 
-    best_label = f"retorno={best_score:+.1f}%" if objective_mode == 'profit' else f"score={best_score:.4f}"
-    print(f"\n  Melhor config: SL={sl_b:.2f}%, TP={tp_b:.2f}%, T={thr_b:.2f}  ({best_label})")
+    best_label = f"return={best_score:+.1f}%" if objective_mode == 'profit' else f"score={best_score:.4f}"
+    print(f"\n  Best config: SL={sl_b:.2f}%, TP={tp_b:.2f}%, T={thr_b:.2f}  ({best_label})")
 
-    # Calcular métricas finais — validação (anos que o Optuna optimizou)
-    sharpe_total_val = retorno_total_val = max_dd_total_val = win_rate_total_val = trades_total_val = sortino_total_val = 0.0
+    # Compute final metrics — validation (years Optuna optimized)
+    sharpe_total_val = return_total_val = max_dd_total_val = win_rate_total_val = trades_total_val = sortino_total_val = 0.0
     equity_val = 500.0
-    equity_por_ano_val = {}
+    equity_by_year_val = {}
 
-    for year, data in sorted(data_por_ano_val.items()):
+    for year, data in sorted(data_by_year_val.items()):
         probs_safe = np.where(data['atr_regime'] > atr_kill, 0.0, data['probs'])
         ret, sharpe, max_dd, n_trades, win_rate, sortino = simulate_numba(
             data['high'], data['low'], data['close'],
@@ -491,32 +491,32 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
             sl_b, tp_b, thr_b, 0.0, max_pos=max_pos, fee_pct=0.002,
         )
         equity_val = equity_val * (1 + ret / 100)
-        equity_por_ano_val[year] = round(equity_val, 2)
+        equity_by_year_val[year] = round(equity_val, 2)
         sharpe_total_val   += sharpe
         sortino_total_val  += sortino
-        retorno_total_val  += ret
+        return_total_val   += ret
         max_dd_total_val    = min(max_dd_total_val, max_dd)
         win_rate_total_val  = win_rate
         trades_total_val   += n_trades
 
-    n_anos_val     = max(len(data_por_ano_val), 1)
-    sharpe_validation = sharpe_total_val / n_anos_val
-    sortino_val    = sortino_total_val / n_anos_val
-    retorno_medio_val = retorno_total_val / n_anos_val
+    n_years_val     = max(len(data_by_year_val), 1)
+    sharpe_validation = sharpe_total_val / n_years_val
+    sortino_val    = sortino_total_val / n_years_val
+    return_avg_val = return_total_val / n_years_val
 
     print(f"  [VAL] Sharpe(val)={sharpe_validation:.2f} | Sortino={sortino_val:.2f} | "
-          f"Retorno médio={retorno_medio_val:+.1f}% | DD={abs(max_dd_total_val):.1f}%")
-    print(f"  Equity val (500€): ", end="")
-    for yr, eq in equity_por_ano_val.items():
+          f"Average return={return_avg_val:+.1f}% | DD={abs(max_dd_total_val):.1f}%")
+    print(f"  Equity val (€500): ", end="")
+    for yr, eq in equity_by_year_val.items():
         print(f"{yr}→ €{eq:.0f}  ", end="")
     print()
 
-    # Calcular métricas finais — holdout (passivo, nunca tocado pelo Optuna)
-    sharpe_total_hld = retorno_total_hld = max_dd_total_hld = win_rate_total_hld = trades_total_hld = sortino_total_hld = 0.0
+    # Compute final metrics — holdout (passive, never touched by Optuna)
+    sharpe_total_hld = return_total_hld = max_dd_total_hld = win_rate_total_hld = trades_total_hld = sortino_total_hld = 0.0
     equity_hld = 500.0
-    equity_por_ano_hld = {}
+    equity_by_year_hld = {}
 
-    for year, data in sorted(data_por_ano_holdout.items()):
+    for year, data in sorted(data_by_year_holdout.items()):
         probs_safe = np.where(data['atr_regime'] > atr_kill, 0.0, data['probs'])
         ret, sharpe, max_dd, n_trades, win_rate, sortino = simulate_numba(
             data['high'], data['low'], data['close'],
@@ -524,43 +524,43 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
             sl_b, tp_b, thr_b, 0.0, max_pos=max_pos, fee_pct=0.002,
         )
         equity_hld = equity_hld * (1 + ret / 100)
-        equity_por_ano_hld[year] = round(equity_hld, 2)
+        equity_by_year_hld[year] = round(equity_hld, 2)
         sharpe_total_hld   += sharpe
         sortino_total_hld  += sortino
-        retorno_total_hld  += ret
+        return_total_hld   += ret
         max_dd_total_hld    = min(max_dd_total_hld, max_dd)
         win_rate_total_hld  = win_rate
         trades_total_hld   += n_trades
 
-    n_anos_hld = max(len(data_por_ano_holdout), 1)
-    sharpe_holdout    = sharpe_total_hld / n_anos_hld if data_por_ano_holdout else 0.0
-    retorno_medio_hld = retorno_total_hld / n_anos_hld if data_por_ano_holdout else 0.0
-    retorno_oos_hld   = (equity_hld / 500.0 - 1) * 100
-    lucro_hld         = equity_hld - 500.0
+    n_years_hld = max(len(data_by_year_holdout), 1)
+    sharpe_holdout    = sharpe_total_hld / n_years_hld if data_by_year_holdout else 0.0
+    return_avg_hld = return_total_hld / n_years_hld if data_by_year_holdout else 0.0
+    return_oos_hld   = (equity_hld / 500.0 - 1) * 100
+    profit_hld         = equity_hld - 500.0
 
-    print(f"  [HOLDOUT/passivo] Sharpe={sharpe_holdout:.2f} | Retorno={retorno_medio_hld:+.1f}% | "
+    print(f"  [HOLDOUT/passive] Sharpe={sharpe_holdout:.2f} | Return={return_avg_hld:+.1f}% | "
           f"DD={abs(max_dd_total_hld):.1f}% | Equity: ", end="")
-    for yr, eq in equity_por_ano_hld.items():
+    for yr, eq in equity_by_year_hld.items():
         print(f"{yr}→ €{eq:.0f}  ", end="")
-    print(f"| Total: {retorno_oos_hld:+.1f}% (€{lucro_hld:+.0f})")
+    print(f"| Total: {return_oos_hld:+.1f}% (€{profit_hld:+.0f})")
 
-    # Métricas agregadas para retorno dict (usa validação como primário)
-    sharpe_medio  = sharpe_validation
-    sortino_medio = sortino_val
-    retorno_medio = retorno_medio_val
+    # Aggregated metrics for return dict (uses validation as primary)
+    sharpe_avg  = sharpe_validation
+    sortino_avg = sortino_val
+    return_avg = return_avg_val
     max_dd_total  = max_dd_total_val
     win_rate_total = win_rate_total_val
     trades_total  = trades_total_val
     equity        = equity_val
-    equity_por_ano = {**equity_por_ano_val, **equity_por_ano_hld}
-    retorno_oos   = retorno_oos_hld  # retorno OOS reportado = holdout (verdadeiro OOS)
-    lucro         = lucro_hld
+    equity_by_year = {**equity_by_year_val, **equity_by_year_hld}
+    return_oos   = return_oos_hld  # reported OOS return = holdout (true OOS)
+    profit         = profit_hld
 
-    # Análise forense do drawdown — usar simulate_numba_equity no primeiro ano de validação
+    # Drawdown forensics — use simulate_numba_equity on the first validation year
     drawdown_forensics = {}
     try:
-        ano_forensic = sorted(data_por_ano_val.keys())[0]
-        data_f = data_por_ano_val[ano_forensic]
+        forensic_year = sorted(data_by_year_val.keys())[0]
+        data_f = data_by_year_val[forensic_year]
         probs_f = np.where(data_f['atr_regime'] > atr_kill, 0.0, data_f['probs'])
         _, _, _, _, _, _sortino, equity_curve, dd_start, dd_end = simulate_numba_equity(
             data_f['high'], data_f['low'], data_f['close'],
@@ -575,33 +575,33 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
             dd_dur_days  = (dd_end - dd_start) / CANDLES_PER_DAY
             dd_depth_pct = float((equity_curve[dd_end] / equity_curve[dd_start] - 1) * 100)
 
-            # Classificar regime de mercado durante o DD
+            # Classify market regime during the DD
             if dd_adx_mean < 20:
-                regime = "Mercado Lateral / Sem Tendência (ADX < 20)"
+                regime = "Sideways / No Trend (ADX < 20)"
             elif dd_adx_mean < 30:
-                regime = "Tendência Fraca (ADX 20-30)"
+                regime = "Weak Trend (ADX 20-30)"
             else:
-                regime = "Tendência Forte (ADX > 30)"
+                regime = "Strong Trend (ADX > 30)"
 
             drawdown_forensics = {
-                'ano':          ano_forensic,
+                'ano':          forensic_year,
                 'dur_dias':     round(dd_dur_days, 1),
                 'profundidade': round(dd_depth_pct, 2),
                 'adx_medio':    round(dd_adx_mean, 1),
                 'adx_minimo':   round(dd_adx_min, 1),
                 'regime':       regime,
             }
-            print(f"  Forense DD ({ano_forensic}): {dd_dur_days:.0f} dias | ADX médio={dd_adx_mean:.1f} | {regime}")
+            print(f"  DD forensics ({forensic_year}): {dd_dur_days:.0f} days | ADX avg={dd_adx_mean:.1f} | {regime}")
     except Exception:
         pass
 
-    # Importância dos parâmetros Optuna (quanto cada dim contribuiu para o score)
+    # Optuna parameter importance (how much each dimension contributed to the score)
     optuna_param_importance = {}
     try:
         from optuna.importance import get_param_importances
         raw_imp = get_param_importances(study)
         optuna_param_importance = {k: round(float(v), 4) for k, v in raw_imp.items()}
-        # Mapear nomes internos para nomes de params do research_params
+        # Map internal names to research_params names
         name_map = {'sl_pct': 'SL_RANGE', 'tp_pct': 'TP_RANGE', 'threshold': 'THRESHOLD_RANGE'}
         optuna_param_importance = {name_map.get(k, k): v for k, v in optuna_param_importance.items()}
         sorted_imp = sorted(optuna_param_importance.items(), key=lambda x: -x[1])
@@ -610,11 +610,11 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
         pass
 
     return {
-        'sharpe_raw':               sharpe_medio,       # = sharpe_validation (primário)
-        'sharpe_validation':        sharpe_validation,  # média sharpe nos anos de validação
-        'sharpe_holdout':           sharpe_holdout,     # passivo — nunca usar p/ aceitar
-        'sortino_raw':              sortino_medio,
-        'retorno_anual_pct':        retorno_medio,
+        'sharpe_raw':               sharpe_avg,       # = sharpe_validation (primary)
+        'sharpe_validation':        sharpe_validation,  # average sharpe over validation years
+        'sharpe_holdout':           sharpe_holdout,     # passive — never use for acceptance
+        'sortino_raw':              sortino_avg,
+        'retorno_anual_pct':        return_avg,
         'max_drawdown_pct':         max_dd_total,
         'win_rate_pct':             win_rate_total,
         'n_trades':                 int(trades_total),
@@ -623,9 +623,14 @@ def correr_backtest(config: dict, params: dict, model_dir: Path,
         'tp_pct':                   tp_b,
         'threshold':                thr_b,
         'equity_500_final':         round(equity_val, 2),
-        'equity_500_por_ano':       equity_por_ano,
-        'retorno_total_oos_pct':    round(retorno_oos_hld, 2),  # holdout OOS
+        'equity_500_por_ano':       equity_by_year,
+        'retorno_total_oos_pct':    round(return_oos_hld, 2),  # holdout OOS
         'n_trials_optuna':          n_trials,
         'optuna_param_importance':  optuna_param_importance,
         'drawdown_forensics':       drawdown_forensics,
     }
+
+
+# Backward-compatible aliases for external callers
+calcular_score = calculate_score
+correr_backtest = run_backtest

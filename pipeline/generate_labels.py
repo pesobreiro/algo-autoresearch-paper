@@ -1,11 +1,11 @@
 """
-Geração de labels para o pipeline algo_autoresearch.
+Label generation for the algo_autoresearch pipeline.
 
-Adaptado de btc_only_repro/02_generate_labels.py para ler parâmetros
-de research_params.py em vez de constantes hardcoded.
+Adapted from btc_only_repro/02_generate_labels.py to read parameters
+from research_params.py instead of hardcoded constants.
 
-Sinal de entrada: stoch_rsi_k < ENTRY_STOCH_THRESHOLD AND adx > ENTRY_ADX_THRESHOLD AND ema_diff > 0
-SL/TP: bounds passados ao Optuna no backtest; labels gerados com combo médio dos ranges.
+Entry signal: stoch_rsi_k < ENTRY_STOCH_THRESHOLD AND adx > ENTRY_ADX_THRESHOLD AND ema_diff > 0
+SL/TP: bounds passed to Optuna in backtest; labels generated with average combo of the ranges.
 """
 import sys
 from pathlib import Path
@@ -30,10 +30,10 @@ def simulate_trades_numba(high, low, close, stoch_k, adx, ema_diff,
                           sl_pct, tp_pct,
                           stoch_threshold=20.0, adx_min=25.0, max_pos=5):
     """
-    Simulação de trades com sinal de entrada parametrizável.
+    Trade simulation with a parametrizable entry signal.
 
     Entry: stoch_k < stoch_threshold AND adx > adx_min AND ema_diff > 0
-    Exit: SL ou TP (triple-barrier)
+    Exit: SL or TP (triple-barrier)
     """
     n = len(close)
 
@@ -49,7 +49,7 @@ def simulate_trades_numba(high, low, close, stoch_k, adx, ema_diff,
     res_count = 0
 
     for i in range(50, n - 1):
-        # Verificar saídas
+        # Check exits
         active_count = 0
         for j in range(pos_count):
             p_idx   = pos_entry_idxs[j]
@@ -87,7 +87,7 @@ def simulate_trades_numba(high, low, close, stoch_k, adx, ema_diff,
 
         pos_count = active_count
 
-        # Verificar entradas
+        # Check entries
         if pos_count < max_pos:
             if stoch_k[i] < stoch_threshold and adx[i] > adx_min and ema_diff[i] > 0:
                 pos_entry_idxs[pos_count]   = i
@@ -121,7 +121,7 @@ def load_ticker_data(ticker: str, exchange: str, train_start: int, train_end: in
 
     f15m = find_parquet(data_dir, ticker, '15m', exchange)
     if f15m is None:
-        raise FileNotFoundError(f"Ficheiro 15m não encontrado para {ticker} em {data_dir}")
+        raise FileNotFoundError(f"15m file not found for {ticker} in {data_dir}")
 
     df_15m = pd.read_parquet(f15m)
     df_15m['timestamp'] = pd.to_datetime(df_15m['open_time']).astype('datetime64[ns]')
@@ -141,15 +141,15 @@ def load_ticker_data(ticker: str, exchange: str, train_start: int, train_end: in
     return df_15m, higher_tf
 
 
-def _adicionar_macro_features(df: pd.DataFrame, higher_tf: dict,
-                               ticker: str, exchange: str, data_dir: str) -> pd.DataFrame:
+def _add_macro_features(df: pd.DataFrame, higher_tf: dict,
+                        ticker: str, exchange: str, data_dir: str) -> pd.DataFrame:
     """
-    Adiciona features macro (regime de mercado) ao dataframe merged.
+    Add macro (market regime) features to the merged dataframe.
 
-    Computed features (todas relativas, sem preços absolutos):
-      dist_sma200_pct_1d — distância da SMA200 normalizada (% do preço)
-      btc_trend_1d       — BTC acima/abaixo da EMA50 (cross-asset, 0/1)
-      atr_regime_*       — ATR / rolling_mean(ATR, 50) por timeframe
+    Computed features (all relative, no absolute prices):
+      dist_sma200_pct_1d — distance to SMA200 normalized (% of price)
+      btc_trend_1d       — BTC above/below EMA50 (cross-asset, 0/1)
+      atr_regime_*       — ATR / rolling_mean(ATR, 50) per timeframe
     """
     df = df.copy()
 
@@ -183,7 +183,7 @@ def _adicionar_macro_features(df: pd.DataFrame, higher_tf: dict,
         df.drop(columns='_date', inplace=True)
         df['btc_trend_1d'] = df['btc_trend_1d'].ffill().fillna(0.5)
 
-    # --- 3. atr_regime_* (ratio ATR / rolling mean) ---
+    # --- 3. atr_regime_* (ATR / rolling mean ratio) ---
     for tf in ['15m', '4h', '1d']:
         col = f'atr_pct_{tf}'
         if col in df.columns:
@@ -195,17 +195,17 @@ def _adicionar_macro_features(df: pd.DataFrame, higher_tf: dict,
 
 def process_ticker(ticker, df_15m, higher_tf, params, feature_cols_override=None,
                    exchange='binance', data_dir=None):
-    """Merge timeframes, calcular features, simular trades para todos os combos SL/TP."""
-    log(f"  A fundir timeframes para {ticker.upper()}...")
+    """Merge timeframes, compute features, simulate trades for all SL/TP combos."""
+    log(f"  Merging timeframes for {ticker.upper()}...")
     df = merge_timeframes(df_15m, higher_tf)
     if df is None or len(df) < 200:
-        raise ValueError(f"Dados insuficientes após merge: {len(df) if df is not None else 0} rows")
+        raise ValueError(f"Insufficient data after merge: {len(df) if df is not None else 0} rows")
 
     df = df.sort_values('timestamp').reset_index(drop=True)
     log(f"  Merged: {len(df):,} rows  ({df['timestamp'].min().date()} – {df['timestamp'].max().date()})")
 
-    log(f"  A calcular features macro (dist_sma200_pct, btc_trend, atr_regime)...")
-    df = _adicionar_macro_features(df, higher_tf, ticker, exchange, data_dir)
+    log(f"  Calculating macro features (dist_sma200_pct, btc_trend, atr_regime)...")
+    df = _add_macro_features(df, higher_tf, ticker, exchange, data_dir)
 
     high     = df['high'].to_numpy(np.float64)
     low      = df['low'].to_numpy(np.float64)
@@ -214,7 +214,7 @@ def process_ticker(ticker, df_15m, higher_tf, params, feature_cols_override=None
     adx_arr  = df.get('adx_15m', pd.Series(np.zeros(len(df)))).fillna(0.0).to_numpy(np.float64)
     ema_diff = df.get('ema_diff_15m', pd.Series(np.zeros(len(df)))).fillna(0.0).to_numpy(np.float64)
 
-    # Features para treino — usar whitelist do params ou do get_feature_columns
+    # Training features — use whitelist from params or from get_feature_columns
     if feature_cols_override is not None:
         feature_cols = [c for c in feature_cols_override if c in df.columns]
     else:
@@ -222,8 +222,8 @@ def process_ticker(ticker, df_15m, higher_tf, params, feature_cols_override=None
 
     feature_data = {col: df[col].to_numpy(np.float64) for col in feature_cols}
 
-    # Com Optuna, o SL/TP exato é otimizado no backtest.
-    # Aqui geramos labels com um único combo representativo (ponto médio dos ranges).
+    # With Optuna, the exact SL/TP is optimized in the backtest.
+    # Here we generate labels with a single representative combo (midpoint of the ranges).
     sl_range = params.get('SL_RANGE', (1.0, 6.0))
     tp_range = params.get('TP_RANGE', (2.0, 20.0))
     sl_rep   = (sl_range[0] + sl_range[1]) / 2.0
@@ -238,7 +238,7 @@ def process_ticker(ticker, df_15m, higher_tf, params, feature_cols_override=None
             high, low, close, stoch_k, adx_arr, ema_diff,
             sl_pct, tp_pct, stoch_thr, adx_min, max_pos=5
         )
-        log(f"    Combo representativo: SL={sl_pct:.2f}%, TP={tp_pct:.2f}% → {len(entry_idxs)} trades")
+        log(f"    Representative combo: SL={sl_pct:.2f}%, TP={tp_pct:.2f}% → {len(entry_idxs)} trades")
 
         for k, idx in enumerate(entry_idxs):
             row = {
@@ -267,19 +267,19 @@ def aggregate_labels(trades_df: pd.DataFrame, feature_cols: list) -> pd.DataFram
     return trades_df.groupby(['ticker', 'entry_idx'], sort=False).agg(agg_dict).reset_index()
 
 
-def gerar_labels(config: dict, params: dict, output_path: Path,
-                 feature_cols_override=None) -> dict:
+def generate_labels(config: dict, params: dict, output_path: Path,
+                    feature_cols_override=None) -> dict:
     """
-    Função principal — gera labels e guarda em output_path.
+    Main function — generates labels and saves them to output_path.
 
     Args:
-        config: configuração do sistema (ticker, exchange, etc.)
-        params: parâmetros do research_params.py
-        output_path: onde guardar o parquet de labels
-        feature_cols_override: lista de colunas a usar (ou None para automático)
+        config: system configuration (ticker, exchange, etc.)
+        params: parameters from research_params.py
+        output_path: where to save the labels parquet
+        feature_cols_override: list of columns to use (or None for auto)
 
     Returns:
-        dict com estatísticas
+        dict with statistics
     """
     ticker     = config['pipeline']['ticker']
     exchange   = config['pipeline'].get('exchange', 'binance')
@@ -287,40 +287,42 @@ def gerar_labels(config: dict, params: dict, output_path: Path,
     train_end   = config['pipeline'].get('train_end', 2024)
 
     print(f"\n{'='*70}")
-    print(f"GERAÇÃO DE LABELS — {ticker.upper()}")
-    print(f"  Sinal: stoch_rsi_k < {params['ENTRY_STOCH_THRESHOLD']} "
+    print(f"LABEL GENERATION — {ticker.upper()}")
+    print(f"  Signal: stoch_rsi_k < {params['ENTRY_STOCH_THRESHOLD']} "
           f"AND adx > {params['ENTRY_ADX_THRESHOLD']} AND ema_diff > 0")
     sl_r = params.get('SL_RANGE', (1.0, 6.0))
     tp_r = params.get('TP_RANGE', (2.0, 20.0))
-    print(f"  Optuna bounds: SL={sl_r}, TP={tp_r} | Labels com combo representativo (médio)")
+    print(f"  Optuna bounds: SL={sl_r}, TP={tp_r} | Labels using representative combo (mean)")
     print(f"{'='*70}")
 
-    # Compilar numba
-    print("  A compilar Numba...", end='', flush=True)
+    # Compile numba
+    print("  Compiling Numba...", end='', flush=True)
     _d = np.ones(200, dtype=np.float64)
     simulate_trades_numba(_d, _d * 0.99, _d, _d * 10.0, _d * 30.0, _d, 1.0, 2.0)
-    print(" pronto")
+    print(" done")
 
-    log(f"A carregar dados {ticker.upper()} ({train_start}–{train_end})...")
+    log(f"Loading data {ticker.upper()} ({train_start}–{train_end})...")
     df_15m, higher_tf = load_ticker_data(ticker, exchange, train_start, train_end)
-    log(f"15m rows: {len(df_15m):,} | TFs superiores: {list(higher_tf.keys())}")
+    log(f"15m rows: {len(df_15m):,} | Higher TFs: {list(higher_tf.keys())}")
 
     start = datetime.now()
     trades, feature_cols = process_ticker(ticker, df_15m, higher_tf, params, feature_cols_override,
                                           exchange=exchange, data_dir=ml_config.DATA_DIR)
 
     if not trades:
-        raise ValueError("Nenhum trade gerado — verificar parâmetros e dados")
+        raise ValueError("No trades generated — check parameters and data")
 
     trades_df = pd.DataFrame(trades)
     elapsed = (datetime.now() - start).total_seconds()
-    log(f"Simulação concluída: {len(trades):,} trade-events em {elapsed:.1f}s")
+    log(f"Simulation completed: {len(trades):,} trade-events in {elapsed:.1f}s")
 
-    log("A agregar labels (maioria)...")
+    log("Aggregating labels (majority)...")
     final_df = aggregate_labels(trades_df, feature_cols)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     final_df.to_parquet(output_path, index=False)
+
+    labels_duration_seconds = elapsed
 
     stats = {
         'n_samples': len(final_df),
@@ -328,12 +330,16 @@ def gerar_labels(config: dict, params: dict, output_path: Path,
         'positive_rate': float(final_df['label'].mean()),
         'n_features': len(feature_cols),
         'feature_cols': feature_cols,
-        'duracao_labels_segundos': elapsed,
+        'duracao_labels_segundos': labels_duration_seconds,
     }
 
-    print(f"\n  Amostras: {stats['n_samples']:,}")
-    print(f"  Positivos: {stats['n_positive']:,} ({stats['positive_rate']*100:.1f}%)")
+    print(f"\n  Samples: {stats['n_samples']:,}")
+    print(f"  Positives: {stats['n_positive']:,} ({stats['positive_rate']*100:.1f}%)")
     print(f"  Features: {stats['n_features']}")
-    print(f"  Guardado em: {output_path}")
+    print(f"  Saved to: {output_path}")
 
     return stats
+
+
+# Backward-compatible alias for external callers
+gerar_labels = generate_labels

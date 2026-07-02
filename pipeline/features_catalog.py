@@ -1,63 +1,63 @@
 """
-Catálogo de features relativas permitidas.
+Catalog of allowed relative features.
 
-Todas as features neste catálogo são garantidamente relativas (sem preços absolutos).
-O agente LLM só pode usar features deste catálogo em research_params.py.
+All features in this catalog are guaranteed to be relative (no absolute prices).
+The LLM agent may only use features from this catalog in research_params.py.
 
-Estrutura: CATALOG[base_name] = descrição
-Features são expandidas por timeframe em run_pipeline.py.
+Structure: CATALOG[base_name] = description
+Features are expanded by timeframe in run_pipeline.py.
 """
 
-# Features disponíveis por timeframe (todas relativas)
+# Available features per timeframe (all relative)
 CATALOG = {
-    # Osciladores (0-100 por design)
+    # Oscillators (0-100 by design)
     "stoch_rsi_k":     "Stochastic RSI %K (0-100)",
     "stoch_rsi_d":     "Stochastic RSI %D (0-100)",
     "rsi":             "Relative Strength Index (0-100)",
     "bb_position":     "Bollinger Band position (0=lower, 1=upper)",
     "adx":             "Average Directional Index (0-100)",
 
-    # Normalizados por preço (ratio/percentagem)
-    "ema_diff":        "EMA fast-slow diferença normalizada pelo preço (%)",
-    "trend":           "Direção da EMA (0=baixa, 1=alta, binário)",
-    "returns_1":       "Retorno percentual 1 período (%)",
-    "atr_pct":         "ATR normalizado pelo preço (%)",
-    "macd_pct":        "MACD normalizado pelo preço (%)",
-    "macd_signal_pct": "MACD signal normalizado pelo preço (%)",
-    "macd_hist_pct":   "MACD histogram normalizado pelo preço (%)",
-    "bb_width_pct":    "Largura das Bandas de Bollinger normalizada (%)",
+    # Normalized by price (ratio/percentage)
+    "ema_diff":        "EMA fast-slow difference normalized by price (%)",
+    "trend":           "EMA direction (0=down, 1=up, binary)",
+    "returns_1":       "1-period percent return (%)",
+    "atr_pct":         "ATR normalized by price (%)",
+    "macd_pct":        "MACD normalized by price (%)",
+    "macd_signal_pct": "MACD signal normalized by price (%)",
+    "macd_hist_pct":   "MACD histogram normalized by price (%)",
+    "bb_width_pct":    "Bollinger Bands width normalized (%)",
 
-    # 15m apenas
-    "volume_norm":     "Volume normalizado pela média móvel de 20 períodos (apenas 15m)",
-    "returns_5":       "Retorno percentual 5 períodos (apenas 15m)",
+    # 15m only
+    "volume_norm":     "Volume normalized by 20-period moving average (15m only)",
+    "returns_5":       "5-period percent return (15m only)",
 
-    # Macro / regime de mercado (apenas 1d)
-    "dist_sma200_pct": "Distância à SMA200 normalizada pelo preço (%, apenas 1d)",
-    "btc_trend":       "BTC acima/abaixo da EMA50 (0=baixo, 1=alto, apenas 1d, cross-asset)",
-    "atr_regime":      "ATR atual / média móvel 50p do ATR (ratio de volatilidade, todos os TFs)",
+    # Macro / market regime (1d only)
+    "dist_sma200_pct": "Distance to SMA200 normalized by price (%, 1d only)",
+    "btc_trend":       "BTC above/below EMA50 (0=down, 1=up, 1d only, cross-asset)",
+    "atr_regime":      "Current ATR / 50-period moving average of ATR (volatility ratio, all TFs)",
 }
 
-# Features exclusivas do timeframe 15m (sufixo _15m)
+# Features exclusive to the 15m timeframe (_15m suffix)
 FEATURES_15M_ONLY = {"volume_norm", "returns_5"}
 
-# Features exclusivas do timeframe 1d (sufixo _1d)
+# Features exclusive to the 1d timeframe (_1d suffix)
 FEATURES_1D_ONLY = {"dist_sma200_pct", "btc_trend"}
 
-# Features proibidas (preços absolutos — NUNCA incluir)
+# Forbidden features (absolute prices — NEVER include)
 FORBIDDEN = {
     "close", "open", "high", "low", "volume",
     "ema_fast", "ema_slow", "atr", "bb_width",
     "macd", "macd_signal", "macd_hist",
 }
 
-# Timeframes suportados
+# Supported timeframes
 SUPPORTED_TIMEFRAMES = ["15m", "4h", "1d"]
 
 
-def _normalizar_nome(feat: str) -> str:
+def _normalize_name(feat: str) -> str:
     """
-    Normaliza nome de feature removendo sufixos de timeframe se presentes.
-    Ex: 'returns_5_15m' → 'returns_5', 'stoch_rsi_k_4h' → 'stoch_rsi_k'
+    Normalize a feature name by removing timeframe suffixes if present.
+    Ex: 'returns_5_15m' -> 'returns_5', 'stoch_rsi_k_4h' -> 'stoch_rsi_k'
     """
     for tf in SUPPORTED_TIMEFRAMES:
         if feat.endswith(f"_{tf}"):
@@ -67,51 +67,51 @@ def _normalizar_nome(feat: str) -> str:
 
 def get_feature_columns(features: list, timeframes: list) -> list:
     """
-    Expande features e timeframes para nomes de colunas concretos.
+    Expand features and timeframes into concrete column names.
 
-    Aceita tanto nomes base ('returns_5') como nomes completos ('returns_5_15m').
+    Accepts both base names ('returns_5') and full names ('returns_5_15m').
 
     Args:
-        features: lista de base names (ex: ["stoch_rsi_k", "returns_5_15m"])
-        timeframes: lista de timeframes (ex: ["15m", "4h"])
+        features: list of base names (ex: ["stoch_rsi_k", "returns_5_15m"])
+        timeframes: list of timeframes (ex: ["15m", "4h"])
 
     Returns:
-        Lista de nomes de colunas (ex: ["stoch_rsi_k_15m", "rsi_15m", ...])
+        List of column names (ex: ["stoch_rsi_k_15m", "rsi_15m", ...])
     """
     cols = []
     for tf in timeframes:
         for feat_raw in features:
-            feat = _normalizar_nome(feat_raw)  # strip sufixo se presente
+            feat = _normalize_name(feat_raw)  # strip suffix if present
             if feat in FORBIDDEN:
-                raise ValueError(f"Feature proibida: '{feat}' (preço absoluto)")
+                raise ValueError(f"Forbidden feature: '{feat}' (absolute price)")
             if feat not in CATALOG:
-                raise ValueError(f"Feature não catalogada: '{feat}' (original: '{feat_raw}')")
+                raise ValueError(f"Feature not in catalog: '{feat}' (original: '{feat_raw}')")
             if feat in FEATURES_15M_ONLY and tf != "15m":
-                continue  # volume_norm e returns_5 só existem em 15m
+                continue  # volume_norm and returns_5 only exist in 15m
             if feat in FEATURES_1D_ONLY and tf != "1d":
-                continue  # dist_sma200_pct e btc_trend só existem em 1d
+                continue  # dist_sma200_pct and btc_trend only exist in 1d
             col = f"{feat}_{tf}"
-            if col not in cols:  # evitar duplicados se LLM passar ambos
+            if col not in cols:  # avoid duplicates if LLM passes both
                 cols.append(col)
     return cols
 
 
 def validate_features(features: list) -> tuple[bool, str]:
-    """Valida lista de features contra o catálogo (aceita nomes com ou sem sufixo de timeframe)."""
+    """Validate a feature list against the catalog (accepts names with or without timeframe suffix)."""
     for feat_raw in features:
-        feat = _normalizar_nome(feat_raw)
+        feat = _normalize_name(feat_raw)
         if feat in FORBIDDEN:
-            return False, f"Feature proibida: '{feat}'"
+            return False, f"Forbidden feature: '{feat}'"
         if feat not in CATALOG:
-            return False, f"Feature não no catálogo: '{feat}' (original: '{feat_raw}')"
+            return False, f"Feature not in catalog: '{feat}' (original: '{feat_raw}')"
     return True, "OK"
 
 
 def validate_timeframes(timeframes: list) -> tuple[bool, str]:
-    """Valida lista de timeframes."""
+    """Validate a list of timeframes."""
     for tf in timeframes:
         if tf not in SUPPORTED_TIMEFRAMES:
-            return False, f"Timeframe inválido: '{tf}'. Suportados: {SUPPORTED_TIMEFRAMES}"
+            return False, f"Invalid timeframe: '{tf}'. Supported: {SUPPORTED_TIMEFRAMES}"
     if len(timeframes) == 0:
-        return False, "Lista de timeframes vazia"
+        return False, "Timeframe list empty"
     return True, "OK"
