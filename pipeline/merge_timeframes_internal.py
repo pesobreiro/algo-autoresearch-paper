@@ -1,7 +1,6 @@
 """
 Internal copy of the external feature-merge module for reproducibility and audit.
 
-Original source: ~/git/ml_sessions/features/technical.py
 Imported at runtime by pipeline/backtest.py and pipeline/generate_labels.py as
 `features.technical.merge_timeframes`. This file preserves the same causal logic:
 - CANDLE_OFFSETS shifts higher-timeframe timestamps from open to close (RULE 2).
