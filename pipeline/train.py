@@ -204,7 +204,3 @@ def train_model(config: dict, params: dict, data_path: Path,
 
     print(f"  Model saved: {model_path}")
     return stats
-
-
-# Backward-compatible alias for external callers
-treinar_modelo = train_model

@@ -162,9 +162,6 @@ class Tracker:
         console.print(f"[green]Tag '{tag}' added to iteration {iteration}[/green]")
         return True
 
-    # Backward-compatible aliases used by main.py
-    adicionar_tag = add_tag
-
     def load_experiences_by_tag(self, tag: str) -> list[ExperimentRecord]:
         """Returns experiences with the specified tag."""
         return [r for r in self._cache if tag in r.tags]
@@ -206,9 +203,6 @@ class Tracker:
         if not accepted:
             return None
         return max(accepted, key=self._sort_key)
-
-    # Backward-compatible aliases used by main.py
-    melhor_score = best_score
 
     def last_accepted(self) -> Optional[ExperimentRecord]:
         """Returns the last accepted experience."""
@@ -299,9 +293,6 @@ class Tracker:
                           f"{scores[0]:.4f} → {scores[-1]:.4f}")
 
         return ""
-
-    # Backward-compatible aliases used by main.py
-    gerar_relatorio_analise = generate_analysis_report
 
     def hash_already_explored(self, params_hash: str) -> bool:
         """Checks whether this exact config was already tested (accepted or rejected with pipeline)."""

@@ -73,8 +73,8 @@ def run(iters, review_interval, season, config_path):
     experiments_dir = _experiments_dir(base_dir, season)
 
     # Verify prerequisites
-    from autoresearch.runner import verificar_pre_requisitos
-    ok, errors = verificar_pre_requisitos(config)
+    from autoresearch.runner import check_prerequisites
+    ok, errors = check_prerequisites(config)
 
     if not ok:
         console.print(Panel(
@@ -91,10 +91,10 @@ def run(iters, review_interval, season, config_path):
         border_style="green",
     ))
 
-    from autoresearch.runner import executar_loop
-    executar_loop(
+    from autoresearch.runner import run_loop
+    run_loop(
         config=config,
-        max_iteracoes=iters,
+        max_iterations=iters,
         human_review_interval=review_interval,
         experiments_dir=experiments_dir,
     )
@@ -113,7 +113,7 @@ def review(season, config_path):
 
     from autoresearch.tracker import Tracker
     tracker = Tracker(experiments_dir)
-    tracker.gerar_relatorio_analise()
+    tracker.generate_analysis_report()
 
 
 @cli.command()
@@ -134,7 +134,7 @@ def tag(iteration, label, note, season, config_path):
 
     from autoresearch.tracker import Tracker
     tracker = Tracker(experiments_dir)
-    ok = tracker.adicionar_tag(iteration, label, note)
+    ok = tracker.add_tag(iteration, label, note)
     if ok:
         console.print(f"[green]✓ Tag '{label}' added to iteration {iteration} (S{season})[/green]")
 
@@ -152,7 +152,7 @@ def analysis(season, config_path):
 
     from autoresearch.tracker import Tracker
     tracker = Tracker(experiments_dir)
-    tracker.gerar_relatorio_analise()
+    tracker.generate_analysis_report()
 
 
 @cli.command('new-season')
@@ -178,7 +178,7 @@ def new_season(config_path, dry_run):
     # Load best result of current season
     from autoresearch.tracker import Tracker
     tracker = Tracker(experiments_dir)
-    best = tracker.melhor_score()
+    best = tracker.best_score()
 
     if best is None:
         console.print(f"[yellow]No accepted results in S{current_season}. "
@@ -506,17 +506,17 @@ def setup(config_path):
 
     # 1. LLM Server
     server_url = config.get('llm', {}).get('server_url', 'http://localhost:8080')
-    from autoresearch.agent import verificar_servidor_llm
-    llm_ok = verificar_servidor_llm(server_url)
+    from autoresearch.agent import check_llm_server
+    llm_ok = check_llm_server(server_url)
     checks.append(('LLM Server', llm_ok,
                    f"Accessible at {server_url}" if llm_ok
                    else f"NOT accessible at {server_url}"))
 
     # 2. research_params.py
     params_path = Path(__file__).parent / 'pipeline' / 'research_params.py'
-    from autoresearch.agent import validar_codigo
+    from autoresearch.agent import validate_code
     if params_path.exists():
-        ok, msg = validar_codigo(params_path.read_text())
+        ok, msg = validate_code(params_path.read_text())
         checks.append(('research_params.py', ok, msg if ok else f"Invalid: {msg}"))
     else:
         checks.append(('research_params.py', False, 'File not found'))

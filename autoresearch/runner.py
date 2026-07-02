@@ -27,7 +27,7 @@ from autoresearch.tracker import Tracker, ExperimentRecord
 from autoresearch.human_loop import (
     show_iteration_result, show_proposed_params, request_human_review
 )
-from pipeline.run_pipeline import executar_pipeline, carregar_params, hash_entry_params, hash_params_completo
+from pipeline.run_pipeline import run_pipeline, load_params, hash_entry_params, hash_params_complete
 
 console = Console()
 
@@ -85,7 +85,7 @@ def check_prerequisites(config: dict) -> tuple[bool, list[str]]:
         errors.append(f"research_params.py not found: {params_path}")
     else:
         try:
-            params = carregar_params(params_path)
+            params = load_params(params_path)
             ok, message = validate_code(params_path.read_text())
             if not ok:
                 errors.append(f"research_params.py invalid: {message}")
@@ -93,10 +93,6 @@ def check_prerequisites(config: dict) -> tuple[bool, list[str]]:
             errors.append(f"Error loading research_params.py: {e}")
 
     return len(errors) == 0, errors
-
-
-# Backward-compatible alias used by main.py
-verificar_pre_requisitos = check_prerequisites
 
 
 def clean_cache(cache_dir: Path, current_params_hash: str,
@@ -205,11 +201,11 @@ def _update_program_md_top(program_path: Path, top_records: list[dict]):
     if sl_vals:
         tfs_dom = max(tfs_counter, key=tfs_counter.get)
         lines.append(
-            f"**Padrão dominante:** SL={_fmt_num(sum(sl_vals)/len(sl_vals), 1)}% "
+            f"**Dominant pattern:** SL={_fmt_num(sum(sl_vals)/len(sl_vals), 1)}% "
             f"(±{_fmt_num((max(sl_vals)-min(sl_vals))/2, 1)}) | "
             f"TP={_fmt_num(sum(tp_vals)/len(tp_vals), 1)}% (±{_fmt_num((max(tp_vals)-min(tp_vals))/2, 1)}) | "
             f"Thr={_fmt_num(sum(thr_vals)/len(thr_vals), 2)} | TFs={tfs_dom}  \n"
-            f"→ Explora variações de features e entry signal nesta zona. Não repitas params iguais.\n"
+            f"→ Explore feature and entry-signal variations in this zone. Do not repeat identical params.\n"
         )
 
     section = "\n---\n\n" + "".join(lines) + "\n---\n"
@@ -217,9 +213,9 @@ def _update_program_md_top(program_path: Path, top_records: list[dict]):
     # Replace existing section or append at the end
     text = program_path.read_text() if program_path.exists() else ""
     import re as _re
-    if "## 📊 Melhores Resultados Actuais" in text:
+    if "## 📊 Current Best Results" in text:
         text = _re.sub(
-            r'\n---\n\n## 📊 Melhores Resultados Actuais.*?\n---\n',
+            r'\n---\n\n## 📊 Current Best Results.*?\n---\n',
             section, text, flags=_re.DOTALL
         )
     else:
@@ -330,7 +326,7 @@ def run_loop(config: dict, max_iterations: int = 0,
 
         # --- 1. Load current params ---
         current_code = params_path.read_text()
-        current_params = carregar_params(params_path)
+        current_params = load_params(params_path)
 
         # --- 2. LLM propose new params ---
         console.print("  [dim]Querying LLM...[/dim]")
@@ -376,7 +372,7 @@ def run_loop(config: dict, max_iterations: int = 0,
         recent_rejections.clear()
 
         # Auto-correct N_TRIALS_XGB: force 0 unless in exploit mode or option B
-        exploit_mode = "MODO EXPLOIT ATIVO" in program_md or "OPÇÃO B" in program_md
+        exploit_mode = "EXPLOIT MODE ACTIVE" in program_md or "OPTION B" in program_md
         if not exploit_mode:
             import re as _re
             corrected_code = _re.sub(
@@ -395,8 +391,8 @@ def run_loop(config: dict, max_iterations: int = 0,
         shutil.copy2(params_path, backup_path)
         params_path.write_text(proposed_code)
 
-        new_params = carregar_params(params_path)
-        new_hash = hash_params_completo(new_params)
+        new_params = load_params(params_path)
+        new_hash = hash_params_complete(new_params)
 
         # --- 4b. Early stopping: reject already explored configuration ---
         if tracker.hash_already_explored(new_hash):
@@ -432,7 +428,7 @@ def run_loop(config: dict, max_iterations: int = 0,
 
         # --- 5. Run pipeline ---
         start_time = time.time()
-        result = executar_pipeline(config, params_path, cache_dir)
+        result = run_pipeline(config, params_path, cache_dir)
         duration = time.time() - start_time
 
         # --- 6. Calculate score and decide ---
@@ -468,7 +464,7 @@ def run_loop(config: dict, max_iterations: int = 0,
                 iteration=iteration,
                 status='rejeitado',
                 metricas=result.metricas,
-                params_hash=hash_params_completo(new_params),
+                params_hash=hash_params_complete(new_params),
                 labels_reutilizados=result.labels_reutilizados,
                 duracao=duration,
                 alteracoes=f"DUPLICATE RESULT: SL={_fmt_num(sl)}% TP={_fmt_num(tp)}%",
@@ -531,7 +527,7 @@ def run_loop(config: dict, max_iterations: int = 0,
             clean_cache(
                 cache_dir,
                 current_params_hash=hash_entry_params(new_params, train_start=_train_start, train_end=_train_end),
-                current_model_hash=hash_params_completo(new_params),
+                current_model_hash=hash_params_complete(new_params),
             )
 
         # --- 8. Register ---
@@ -539,7 +535,7 @@ def run_loop(config: dict, max_iterations: int = 0,
             iteration=iteration,
             status=status,
             metricas=result.metricas if result.sucesso else {'score_composto': current_score},
-            params_hash=hash_params_completo(new_params),
+            params_hash=hash_params_complete(new_params),
             labels_reutilizados=result.labels_reutilizados,
             duracao=duration,
             alteracoes=changes,
@@ -564,12 +560,3 @@ def run_loop(config: dict, max_iterations: int = 0,
                 console.print("  [cyan]Using manually injected params.[/cyan]")
 
         iteration += 1
-
-
-# Backward-compatible wrapper used by main.py (keeps Portuguese parameter names)
-def executar_loop(config: dict, max_iteracoes: int = 0,
-                  human_review_interval: int = 5,
-                  experiments_dir: Path = None,
-                  cache_dir: Path = None):
-    """Backward-compatible wrapper for run_loop."""
-    return run_loop(config, max_iteracoes, human_review_interval, experiments_dir, cache_dir)

@@ -629,8 +629,3 @@ def run_backtest(config: dict, params: dict, model_dir: Path,
         'optuna_param_importance':  optuna_param_importance,
         'drawdown_forensics':       drawdown_forensics,
     }
-
-
-# Backward-compatible aliases for external callers
-calcular_score = calculate_score
-correr_backtest = run_backtest

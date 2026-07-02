@@ -576,10 +576,6 @@ def validate_code(code: str) -> tuple[bool, str]:
     return True, "OK"
 
 
-# Backward-compatible aliases used by main.py
-validar_codigo = validate_code
-
-
 def check_llm_server(server_url: str) -> bool:
     """Checks whether the LLM server is accessible."""
     try:
@@ -587,7 +583,3 @@ def check_llm_server(server_url: str) -> bool:
         return response.status_code == 200
     except Exception:
         return False
-
-
-# Backward-compatible alias used by main.py
-verificar_servidor_llm = check_llm_server

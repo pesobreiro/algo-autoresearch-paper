@@ -236,10 +236,3 @@ def run_pipeline(config: dict, params_path: Path,
         labels_reused=labels_reused,
         total_duration_seconds=duration,
     )
-
-
-# Backward-compatible aliases for external callers
-carregar_params = load_params
-hash_params_completo = hash_params_complete
-executar_pipeline = run_pipeline
-ResultadoPipeline = PipelineResult

@@ -339,7 +339,3 @@ def generate_labels(config: dict, params: dict, output_path: Path,
     print(f"  Saved to: {output_path}")
 
     return stats
-
-
-# Backward-compatible alias for external callers
-gerar_labels = generate_labels
