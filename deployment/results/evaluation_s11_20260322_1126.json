@@ -1,0 +1,195 @@
+{
+  "season": 11,
+  "timestamp": "20260322_1126",
+  "results": [
+    {
+      "iter": 1129,
+      "season": 11,
+      "auc": 0.5787,
+      "sharpe_val": 1.761,
+      "sharpe_val_rerun": 1.446,
+      "sharpe_holdout": 2.922,
+      "sharpe_2026": 3.199,
+      "ret_2026_pct": 2.18,
+      "deploy_score": 3.06,
+      "sl_pct": 7.91,
+      "tp_pct": 7.1,
+      "threshold": 0.857,
+      "n_trades_val": 131,
+      "max_dd_val": -9.11,
+      "by_year": {
+        "2022": {
+          "retorno_pct": 7.52,
+          "sharpe": 0.685,
+          "sortino": 1.011,
+          "max_dd_pct": -9.11,
+          "n_trades": 79,
+          "win_rate_pct": 60.8,
+          "equity_final": 537.59
+        },
+        "2023": {
+          "retorno_pct": 9.14,
+          "sharpe": 1.251,
+          "sortino": 1.888,
+          "max_dd_pct": -4.73,
+          "n_trades": 31,
+          "win_rate_pct": 71.0,
+          "equity_final": 545.71
+        },
+        "2024": {
+          "retorno_pct": 12.53,
+          "sharpe": 2.402,
+          "sortino": 6.959,
+          "max_dd_pct": -1.71,
+          "n_trades": 21,
+          "win_rate_pct": 90.5,
+          "equity_final": 562.63
+        },
+        "2025": {
+          "retorno_pct": 17.81,
+          "sharpe": 2.922,
+          "sortino": 14.846,
+          "max_dd_pct": -0.82,
+          "n_trades": 28,
+          "win_rate_pct": 89.3,
+          "equity_final": 589.07
+        },
+        "2026": {
+          "retorno_pct": 2.18,
+          "sharpe": 3.199,
+          "sortino": 0.0,
+          "max_dd_pct": 0.0,
+          "n_trades": 3,
+          "win_rate_pct": 100.0,
+          "equity_final": 510.89
+        }
+      }
+    },
+    {
+      "iter": 1133,
+      "season": 11,
+      "auc": 0.5787,
+      "sharpe_val": 1.74,
+      "sharpe_val_rerun": 1.33,
+      "sharpe_holdout": 3.348,
+      "sharpe_2026": 2.37,
+      "ret_2026_pct": 2.47,
+      "deploy_score": 2.859,
+      "sl_pct": 7.42,
+      "tp_pct": 8.01,
+      "threshold": 0.856,
+      "n_trades_val": 119,
+      "max_dd_val": -12.12,
+      "by_year": {
+        "2022": {
+          "retorno_pct": 6.0,
+          "sharpe": 0.506,
+          "sortino": 0.68,
+          "max_dd_pct": -12.12,
+          "n_trades": 75,
+          "win_rate_pct": 56.0,
+          "equity_final": 530.01
+        },
+        "2023": {
+          "retorno_pct": 10.73,
+          "sharpe": 1.633,
+          "sortino": 2.388,
+          "max_dd_pct": -4.2,
+          "n_trades": 28,
+          "win_rate_pct": 71.4,
+          "equity_final": 553.66
+        },
+        "2024": {
+          "retorno_pct": 8.24,
+          "sharpe": 1.852,
+          "sortino": 4.34,
+          "max_dd_pct": -1.78,
+          "n_trades": 16,
+          "win_rate_pct": 81.2,
+          "equity_final": 541.18
+        },
+        "2025": {
+          "retorno_pct": 21.44,
+          "sharpe": 3.348,
+          "sortino": 25.702,
+          "max_dd_pct": -0.78,
+          "n_trades": 28,
+          "win_rate_pct": 89.3,
+          "equity_final": 607.18
+        },
+        "2026": {
+          "retorno_pct": 2.47,
+          "sharpe": 2.37,
+          "sortino": 0.0,
+          "max_dd_pct": 0.0,
+          "n_trades": 3,
+          "win_rate_pct": 100.0,
+          "equity_final": 512.36
+        }
+      }
+    },
+    {
+      "iter": 1066,
+      "season": 11,
+      "auc": 0.5956,
+      "sharpe_val": 1.861,
+      "sharpe_val_rerun": 1.527,
+      "sharpe_holdout": 2.596,
+      "sharpe_2026": 2.37,
+      "ret_2026_pct": 1.05,
+      "deploy_score": 2.483,
+      "sl_pct": 9.0,
+      "tp_pct": 9.69,
+      "threshold": 0.868,
+      "n_trades_val": 115,
+      "max_dd_val": -9.58,
+      "by_year": {
+        "2022": {
+          "retorno_pct": 20.42,
+          "sharpe": 1.311,
+          "sortino": 2.065,
+          "max_dd_pct": -9.58,
+          "n_trades": 66,
+          "win_rate_pct": 65.2,
+          "equity_final": 602.1
+        },
+        "2023": {
+          "retorno_pct": 9.09,
+          "sharpe": 1.205,
+          "sortino": 2.135,
+          "max_dd_pct": -3.73,
+          "n_trades": 24,
+          "win_rate_pct": 66.7,
+          "equity_final": 545.45
+        },
+        "2024": {
+          "retorno_pct": 16.34,
+          "sharpe": 2.066,
+          "sortino": 5.934,
+          "max_dd_pct": -2.1,
+          "n_trades": 25,
+          "win_rate_pct": 80.0,
+          "equity_final": 581.71
+        },
+        "2025": {
+          "retorno_pct": 21.65,
+          "sharpe": 2.596,
+          "sortino": 14.604,
+          "max_dd_pct": -1.92,
+          "n_trades": 24,
+          "win_rate_pct": 91.7,
+          "equity_final": 608.26
+        },
+        "2026": {
+          "retorno_pct": 1.05,
+          "sharpe": 2.37,
+          "sortino": 0.0,
+          "max_dd_pct": 0.0,
+          "n_trades": 1,
+          "win_rate_pct": 100.0,
+          "equity_final": 505.27
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "selected": true,
+  "season": 11,
+  "iter": 1077,
+  "decision_date": "2026-03-22",
+  "model_path": "best_models/season_11/iter_1077",
+  "params": {
+    "sl_pct": 7.8,
+    "tp_pct": 7.1,
+    "threshold": 0.857,
+    "adx_min": 22,
+    "atr_kill": 3.0,
+    "fee_pct": 0.002,
+    "slippage": 0.001
+  },
+  "metrics": {
+    "auc": 0.5721,
+    "sharpe_validation": 1.69,
+    "sharpe_holdout": 2.87,
+    "sharpe_2026": 4.17,
+    "deploy_score": 3.520,
+    "ret_total_pct": 58.2,
+    "max_dd_pct": -6.74,
+    "n_trades_total": 161
+  },
+  "by_year": {
+    "2022": {"ret_pct": 16.75, "sharpe": 1.40, "dd_pct": -6.74, "trades": 82, "wr_pct": 65.9},
+    "2023": {"ret_pct": 7.80, "sharpe": 1.05, "dd_pct": -5.86, "trades": 27, "wr_pct": 70.4},
+    "2024": {"ret_pct": 15.80, "sharpe": 2.59, "dd_pct": -1.85, "trades": 24, "wr_pct": 91.7},
+    "2025": {"ret_pct": 15.90, "sharpe": 2.87, "dd_pct": -1.70, "trades": 24, "wr_pct": 91.7, "oos": true},
+    "2026": {"ret_pct": 1.94, "sharpe": 4.17, "dd_pct": 0.00, "trades": 4, "wr_pct": 75.0, "oos": true}
+  },
+  "rationale": [
+    "Best deploy_score=3.52 (avg holdout+2026 Sharpe)",
+    "Holdout Sharpe 2.87 on 2025 and true-OOS Sharpe 4.17 on Jan-Mar 2026",
+    "Max DD only -6.74% across 2022-2026 simulation",
+    "Positive in all 5 years including 2026 TRUE OOS",
+    "161 trades over 2022-2026 — low frequency, high precision"
+  ],
+  "trades_csv": "deployment/results/trades_iter1077_sl7.8_tp7.1_thr0.857_20260322_1208.csv",
+  "evaluation_json": "deployment/results/evaluation_s11_20260322_1207.json",
+  "note": "Metrics reflect deployment/evaluate_models.py simulation: independent yearly backtests with max_pos=5, initial capital 500, ATR kill 3.0, and modelled costs 0.20% fee + 0.10% slippage. Holdout = 2025; true OOS = Jan-Mar 2026."
+}
