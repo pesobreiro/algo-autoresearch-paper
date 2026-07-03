@@ -1,8 +1,8 @@
 # algo-autoresearch-paper
 
-Supporting code, data specification, and reproducibility artifacts for *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*.
+Code, data specification, and reproducibility artifacts for *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*.
 
-## What is here
+## Repository contents
 
 - `autoresearch/` — autonomous LLM-driven strategy generation and validation loop.
 - `pipeline/` — feature engineering, label generation, XGBoost training, and Optuna backtest.
