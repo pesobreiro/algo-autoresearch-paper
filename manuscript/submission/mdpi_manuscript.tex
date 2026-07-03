@@ -132,15 +132,15 @@ The loop repeats until a season budget is exhausted or a target number of accept
 
 \subsection{Feature catalog and temporal-ordering constraints}\label{feature-catalog-and-temporal-ordering-constraints}
 
-All features are computed from OHLCV data at 15-minute, 4-hour, and daily timeframes. The catalog includes technical indicators (RSI, MACD, Bollinger Bands, ADX, ATR, Stochastic RSI, EMA differences), volatility measures, and lagged returns. Every feature is normalised by price or bounded to the current bar, and higher-timeframe indicators are merged into the 15-minute bars only after the corresponding candle has closed. The merge module shifts each higher-timeframe timestamp from its open time to its close time and then uses a backward-looking as-of merge; a daily value observed on day \(t\) therefore first becomes available to the 15-minute model at the close of day \(t\). The validator parses the generated code into an AST and rejects any strategy that references absolute prices after the decision point or that accesses data outside the current bar. These precautions are consistent with standard defences against leakage in data mining [27,21] and backtest overfitting [7], and with L\'{o}pez de Prado's \citep{prado_2018} emphasis on purging and embargo in financial cross-validation: observations that overlap a test period due to long investment horizons, or strongly autocorrelated returns, must be excluded from training and from immediate post-test retraining. Our one-bar look-ahead lag for higher-timeframe merges and the AST-based price-reference check implement these principles in code. We treat this temporal-integrity layer as a design invariant; it is enforced in code review and verified by the out-of-sample stability reported in the results.
+All features are computed from OHLCV data at 15-minute, 4-hour, and daily timeframes. The catalog includes technical indicators (RSI, MACD, Bollinger Bands, ADX, ATR, Stochastic RSI, EMA differences), volatility measures, and lagged returns. Every feature is normalised by price or bounded to the current bar, and higher-timeframe indicators are merged into the 15-minute bars only after the corresponding candle has closed. The merge module shifts each higher-timeframe timestamp from its open time to its close time and then uses a backward-looking as-of merge; a daily value observed on day \(t\) therefore first becomes available to the 15-minute model at the close of day \(t\). The validator parses the generated code into an AST and rejects any strategy that references absolute prices after the decision point or that accesses data outside the current bar. These precautions are consistent with standard defences against leakage in data mining \citep{kaufman_2012,prado_2018} and backtest overfitting \citep{bailey_2017}, and with L\'{o}pez de Prado's \citep{prado_2018} emphasis on purging and embargo in financial cross-validation: observations that overlap a test period due to long investment horizons, or strongly autocorrelated returns, must be excluded from training and from immediate post-test retraining. Our one-bar look-ahead lag for higher-timeframe merges and the AST-based price-reference check implement these principles in code. We treat this temporal-integrity layer as a design invariant; it is enforced in code review and verified by the out-of-sample stability reported in the results.
 
 \subsection{Training and backtesting engine}\label{training-and-backtesting-engine}
 
-Labels are generated with a triple-barrier method [27]: each trade has a profit-taking barrier, a stop-loss barrier, and a vertical time barrier. An XGBoost classifier [10] is trained on the training set and predictions are converted into signals. The backtester simulates trades using Numba-accelerated code. Costs are modeled as a 0.20 \% round-trip fee plus 0.10 \% slippage on entry, following the transaction-cost framework used in optimal execution literature [3]. Stop-loss and take-profit exits are executed at the triggered level without additional slippage in the baseline configuration; Section 4.5 reports a stress-test that adds up to 0.30 \% symmetric slippage on all exits.
+Labels are generated with a triple-barrier method \citep{prado_2018}: each trade has a profit-taking barrier, a stop-loss barrier, and a vertical time barrier. An XGBoost classifier \citep{chen_2016} is trained on the training set and predictions are converted into signals. The backtester simulates trades using Numba-accelerated code. Costs are modeled as a 0.20 \% round-trip fee plus 0.10 \% slippage on entry, following the transaction-cost framework used in optimal execution literature \citep{almgren_2001}. Stop-loss and take-profit exits are executed at the triggered level without additional slippage in the baseline configuration; Section 4.5 reports a stress-test that adds up to 0.30 \% symmetric slippage on all exits.
 
 All Sharpe ratios reported by the engine and in the statistical audit are computed from daily equity changes and annualised with \(\sqrt{365}\), the standard convention for cryptocurrency markets. This convention is used consistently across validation, holdout, and the secondary selection holdout periods.
 
-An optional volatility kill-switch (\texttt{atr\_kill}) zeros model probabilities when the 15-minute ATR exceeds a rolling multiple, preventing entries during extreme volatility spikes. The ATR and ADX indicators used for volatility and trend-strength filtering follow the original definitions of Wilder [34]. In the selected production candidate (S11 iter 1077), the kill-switch was configured at 3.0 rolling standard deviations. Candidate acceptance also requires a maximum drawdown below -15 \%.
+An optional volatility kill-switch (\texttt{atr\_kill}) zeros model probabilities when the 15-minute ATR exceeds a rolling multiple, preventing entries during extreme volatility spikes. The ATR and ADX indicators used for volatility and trend-strength filtering follow the original definitions of Wilder \citep{wilder_1978}. In the selected production candidate (S11 iter 1077), the kill-switch was configured at 3.0 rolling standard deviations. Candidate acceptance also requires a maximum drawdown below -15 \%.
 
 To mitigate overfitting, we use a nested temporal split:
 
@@ -180,7 +180,7 @@ The prompt contains:
   Examples of valid and invalid code patterns.
 \end{itemize}
 
-The agent keeps a memory of recent failures to avoid repetitive proposals. After each season, a human-in-the-loop review (typically 15--30 minutes) updates the season objective and acceptance gates based on the distribution of accepted strategies. This is the primary point of human supervision; within a season, the loop runs without human approval of individual candidates. This mixed-initiative design follows the principles of Horvitz [18] and Amershi et al. [4]: the system performs the bulk of routine experimentation and surfaces structured results, while the human retains control over high-level goals and value alignment. The criteria used at each major transition are documented in Supplementary Table~S2.
+The agent keeps a memory of recent failures to avoid repetitive proposals. After each season, a human-in-the-loop review (typically 15--30 minutes) updates the season objective and acceptance gates based on the distribution of accepted strategies. This is the primary point of human supervision; within a season, the loop runs without human approval of individual candidates. This mixed-initiative design follows the principles of Horvitz \citep{horvitz_1999} and Amershi et al.~\citep{amershi_2019}: the system performs the bulk of routine experimentation and surfaces structured results, while the human retains control over high-level goals and value alignment. The criteria used at each major transition are documented in Supplementary Table~S2.
 
 \subsubsection{Governance and accountability}\label{governance-and-accountability}
 
@@ -238,20 +238,20 @@ For deployment selection, we use a deploy score that averages the passive holdou
 
 Because the deploy score includes \(\text{Sharpe}_{\text{2026}}\), the 2026 period works as a \textbf{secondary selection holdout}: it was used to choose the production candidate from the 30 top holdout candidates that were re-evaluated for deployment from Season 11. It is therefore not an independent prospective test and should be treated only as a noisy post-selection observation. The selected candidate, S11 iter 1077, had the highest deploy score among these 30 re-evaluated candidates; that score is driven primarily by the passive holdout Sharpe because the 2026 window contains only four trades and its Sharpe is extremely noisy.
 
-The selected candidate's passive holdout Sharpe (2.87 on active trading days) comes from a population of 212 accepted strategies in Season 11, so it is also subject to selection bias. Under the simplifying assumption that the 212 accepted holdout Sharpes are i.i.d.~normal with the observed mean (1.37) and standard deviation (0.61), the expected maximum among 212 draws is approximately 3.06 (95 \% interval: 2.66--3.62), and the observed maximum active-day holdout Sharpe of 2.95 lies within the range expected from pure selection; however, the positive mean of the accepted strategies (1.37) indicates that the accepted population as a whole has positive holdout performance. This selection-bias calculation is related to the robust Sharpe inference developed by [20] and [23].
+The selected candidate's passive holdout Sharpe (2.87 on active trading days) comes from a population of 212 accepted strategies in Season 11, so it is also subject to selection bias. Under the simplifying assumption that the 212 accepted holdout Sharpes are i.i.d.~normal with the observed mean (1.37) and standard deviation (0.61), the expected maximum among 212 draws is approximately 3.06 (95 \% interval: 2.66--3.62), and the observed maximum active-day holdout Sharpe of 2.95 lies within the range expected from pure selection; however, the positive mean of the accepted strategies (1.37) indicates that the accepted population as a whole has positive holdout performance. This selection-bias calculation is related to the robust Sharpe inference developed by \citep{jobson_1981} and \citep{ledoit_2008}.
 
 The Q1 2026 Sharpe is based on only four trades and is consequently very noisy; it should not be interpreted as precise evidence of live edge, nor used to rank the candidate against other candidates. We report it as a preliminary post-selection observation rather than as an independent out-of-sample result.
 
 \subsection{Experimental configuration and computational budget}\label{experimental-configuration}
 
-Table 1 summarizes the two strategies analyzed in detail. Table 2 reports how the search evolved across seasons. The full feature catalog is provided in Supplementary Table~S1, and the inter-season design decisions are documented in Supplementary Table~S2.
+Table~\ref{tab:case-study-strategies} summarizes the two strategies analyzed in detail. Table~\ref{tab:season-evolution} reports how the search evolved across seasons. The full feature catalog is provided in Supplementary Table~S1, and the inter-season design decisions are documented in Supplementary Table~S2.
 
 
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}@{}}
-\caption{Case-study strategies}\\
+\caption{Case-study strategies}\label{tab:case-study-strategies}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Feature
@@ -273,7 +273,8 @@ Validation AUC & 0.5721 & 0.5321 \\
 Validation Sharpe (active-day) & 1.69 & 1.39 \\
 Holdout Sharpe (active-day) & 2.87 & 1.15 \\
 Calendar-time holdout Sharpe & 2.34 (2025) & 1.00 (2024--2025) \\
-Total return & 58.2 \% (2022--2026, simple sum) & 27.7 \% (2021--2025) \\
+Total return & 58.2 \% (2022--2026, simple sum) & 44.0 \% (2021--2025, simple sum) \\
+Holdout return (2024--2025) & --- & 27.7 \% (compounded) \\
 Maximum drawdown & -6.74 \% & -8.1 \% \\
 Average win rate & 65.9--91.7 \% & 90.9 \% \\
 Number of trades & 161 (2022--2026) & 38 (2021--2025) \\
@@ -340,7 +341,7 @@ To enable independent replication, we fixed the software environment, random see
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1481}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1481}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1481}}@{}}
-\caption{Evolution of acceptance rate and best holdout Sharpe by season}\\
+\caption{Evolution of acceptance rate and best holdout Sharpe by season}\label{tab:season-evolution}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Season
@@ -375,15 +376,15 @@ Iteration of best holdout
 12 & BTC & 9\,957 & 93 & 0.93 & 1.23 & 1\,736 \\
 \end{longtable}
 
-\emph{Note: Season 1 was a manual initialisation/baseline phase before the automated loop started at Season 2. Scores in S5--S7 used a different scale from S9--S12; the table therefore reports holdout Sharpe as the cross-season comparable metric.}
+\emph{Note: Season 1 was a manual initialization/baseline phase before the automated loop started at Season 2. Scores in S5--S7 used a different scale from S9--S12; the table therefore reports holdout Sharpe as the cross-season comparable metric.}
 
-Figure~2 shows the acceptance rate and the best holdout Sharpe ratio per season. Season 1 was the manual initialisation baseline (32 iterations, score 0.5607, no formal acceptance gates); the automated loop started at Season 2. The early automated seasons (S2--S4) produced no accepted strategies because the acceptance gates were too loose or the search space too unconstrained. Season 5 introduced a profit-mode objective and achieved the first acceptances (0.70 \%). Season 6 introduced stricter criteria, dropping the acceptance rate to 0.01 \% (1 in 12\,864). Seasons 9--12 improve steadily in holdout Sharpe, driven by three changes: passive holdout (S9), bear-market validation (S10), and the triple-gate protocol (S11). Season 12 extended the training window back to 2017 and switched to BTC, a test of cross-asset generalisation.
+Figure~2 shows the acceptance rate and the best holdout Sharpe ratio per season. Season 1 was the manual initialization baseline (32 iterations, score 0.5607, no formal acceptance gates); the automated loop started at Season 2. The early automated seasons (S2--S4) produced no accepted strategies because the acceptance gates were too loose or the search space too unconstrained. Season 5 introduced a profit-mode objective and achieved the first acceptances (0.70 \%). Season 6 introduced stricter criteria, dropping the acceptance rate to 0.01 \% (1 in 12\,864). Seasons 9--12 improve steadily in holdout Sharpe, driven by three changes: passive holdout (S9), bear-market validation (S10), and the triple-gate protocol (S11). Season 12 extended the training window back to 2017 and switched to BTC, a test of cross-asset generalization.
 
 The acceptance rate reached its peak of 5.58 \% in Season 11, but this reflects a richer proposal distribution, not weaker gates: the average composite score fell from 2.03 in S9 to 1.09 in S11 because the scoring weights were renormalised when the acceptance gates tightened (S9 allowed only five strategies with high validation Sharpe but negative average holdout Sharpe; S11 demanded positive holdout Sharpe and lower drawdown, which compressed the score scale). The best holdout Sharpe rose from 1.00 to 2.95 over the same period, so quality improved even as the raw score range shifted.
 
 \subsection{Production model performance}\label{production-model-performance}
 
-The selected production candidate, S11 iter 1077, traded BNB/USDT from 2022 to March 2026. Figure~3 shows the equity curve. Table~3 gives the annual performance. The candidate produced positive returns in 2022--2025 on the passive holdout and validation windows. The 2026 window was used only for deployment selection and is reported as a post-selection observation. The maximum drawdown was -6.74 \%, well below the -15 \% gate. Table~5 compares these returns with a passive buy-and-hold investment in BNB/USDT over the same period.
+The selected production candidate, S11 iter 1077, traded BNB/USDT from 2022 to March 2026. Figure~3 shows the equity curve. Table~\ref{tab:s11-annual-performance} gives the annual performance. The candidate produced positive returns in 2022--2025 on the passive holdout and validation windows. The 2026 window was used only for deployment selection and is reported as a post-selection observation. The maximum drawdown was -6.74 \%, well below the -15 \% gate. Table~\ref{tab:s11-benchmark} compares these returns with a passive buy-and-hold investment in BNB/USDT over the same period.
 
 \begin{figure}[H]
 \centering
@@ -391,9 +392,9 @@ The selected production candidate, S11 iter 1077, traded BNB/USDT from 2022 to M
 \caption{Equity curve --- S11 BNB/USDT iter 1077 (2022--2026).\label{fig3}}
 \end{figure}
 
-The strategy's AUC of 0.5721 shows only marginal predictive power at the individual-bar level; the economic value comes from combining a calibrated probability threshold, asymmetric risk management (7.8 \% stop-loss vs.~7.1 \% take-profit), and an ADX regime filter [34] that avoids weak-trend entries. The wider stop-loss relative to take-profit came from Optuna optimization under the bear-market validation introduced in Season 10: it gives profitable trades room to survive short-term reversals while the high-probability threshold and ADX filter keep entry quality high enough that smaller, more frequent gains offset occasional larger losses.
+The strategy's AUC of 0.5721 shows only marginal predictive power at the individual-bar level; the economic value comes from combining a calibrated probability threshold, asymmetric risk management (7.8 \% stop-loss vs.~7.1 \% take-profit), and an ADX regime filter \citep{wilder_1978} that avoids weak-trend entries. The wider stop-loss relative to take-profit came from Optuna optimization under the bear-market validation introduced in Season 10: it gives profitable trades room to survive short-term reversals while the high-probability threshold and ADX filter keep entry quality high enough that smaller, more frequent gains offset occasional larger losses.
 
-\textbf{Benchmark comparison.} Table 5 compares the strategy's annual returns with a passive buy-and-hold investment in BNB/USDT.
+\textbf{Benchmark comparison.} Table~\ref{tab:s11-benchmark} compares the strategy's annual returns with a passive buy-and-hold investment in BNB/USDT.
 
 
 \begin{longtable}[]{@{}
@@ -404,7 +405,7 @@ The strategy's AUC of 0.5721 shows only marginal predictive power at the individ
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}@{}}
-\caption{Annual performance of the selected production candidate (S11 iter 1077, BNB/USDT)}\\
+\caption{Annual performance of the selected production candidate (S11 iter 1077, BNB/USDT)}\label{tab:s11-annual-performance}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedleft
 Year
@@ -440,7 +441,7 @@ Win rate (\%)
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}@{}}
-\caption{Benchmark comparison: S11 iter 1077 vs.~BNB/USDT buy-and-hold}\\
+\caption{Benchmark comparison: S11 iter 1077 vs.~BNB/USDT buy-and-hold}\label{tab:s11-benchmark}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedleft
 Year
@@ -466,9 +467,9 @@ Difference (\%)
 
 \emph{Note: S11 iter 1077 returns are from the deployment simulation (\texttt{evaluate\_models.py}) with modeled costs 0.20 \% fee + 0.10 \% slippage. BNB/USDT buy-and-hold returns are computed from daily close prices downloaded from the Binance public API; they ignore funding, staking, and custody costs. The 2026 buy-and-hold figure covers 1 January--31 March 2026.}
 
-\subsection{Cross-asset generalisation}\label{cross-asset-generalisation}
+\subsection{Cross-asset generalization}\label{cross-asset-generalization}
 
-To test whether the design works across assets, we ran Season 12 on BTC/USDC with a training window starting in 2017. The selected candidate, S12 iter 5502, passed the validation gates and showed a validation Sharpe of 1.39 and a holdout Sharpe of 1.15, with a 27.7 \% holdout return and a maximum drawdown of -8.1 \% (Figure~4). Table~4 breaks down the annual performance. Returns are positive in every year; the weakest years were 2021 (a late-bull period) and 2024 (a sideways-to-down phase). The lower holdout Sharpe relative to S11 reflects Bitcoin's different volatility regime, but the candidate remained profitable and within risk limits.
+To test whether the design works across assets, we ran Season 12 on BTC/USDC with a training window starting in 2017. The selected candidate, S12 iter 5502, passed the validation gates and showed a validation Sharpe of 1.39 and a holdout Sharpe of 1.15, with a 27.7 \% holdout return (2024--2025) and a maximum drawdown of -8.1 \% (Figure~4). Table~\ref{tab:s12-annual-performance} breaks down the annual performance. Returns are positive in every year; the weakest years were 2021 (a late-bull period) and 2024 (a sideways-to-down phase). The lower holdout Sharpe relative to S11 reflects Bitcoin's different volatility regime, but the candidate remained profitable and within risk limits.
 
 
 \begin{longtable}[]{@{}
@@ -479,7 +480,7 @@ To test whether the design works across assets, we ran Season 12 on BTC/USDC wit
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1739}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1159}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.2029}}@{}}
-\caption{Annual performance of the cross-asset replication (S12 iter 5502, BTC/USDC)}\\
+\caption{Annual performance of the cross-asset replication (S12 iter 5502, BTC/USDC)}\label{tab:s12-annual-performance}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Year
@@ -509,7 +510,7 @@ Win rate (\%)
 
 \emph{Note: Annual returns are computed independently (EUR~500 reset at the start of each year) to make years comparable. The 2021--2023 window was used for validation, 2024--2025 for holdout.}
 
-\textbf{Benchmark comparison.} Table~8 compares the S12 strategy's annual returns with a passive buy-and-hold investment in BTC/USDC. As with the S11 case, the strategy underperforms buy-and-hold in strong bull years (2021, 2023, 2024) but avoids most of the bear-market drawdown and produced positive returns in 2022 and 2025 when the benchmark was negative.
+\textbf{Benchmark comparison.} Table~\ref{tab:s12-benchmark} compares the S12 strategy's annual returns with a passive buy-and-hold investment in BTC/USDC. As with the S11 case, the strategy underperforms buy-and-hold in strong bull years (2021, 2023, 2024) but avoids most of the bear-market drawdown and produced positive returns in 2022 and 2025 when the benchmark was negative.
 
 
 \begin{longtable}[]{@{}
@@ -517,7 +518,7 @@ Win rate (\%)
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}@{}}
-\caption{Benchmark comparison: S12 iter 5502 vs.~BTC/USDC buy-and-hold}\\
+\caption{Benchmark comparison: S12 iter 5502 vs.~BTC/USDC buy-and-hold}\label{tab:s12-benchmark}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedleft
 Year
@@ -537,11 +538,11 @@ Difference (\%)
 2023 & 13.3 & 154.46 & -141.16 \\
 2024 & 5.4 & 111.81 & -106.41 \\
 2025 & 9.3 & -7.34 & +16.64 \\
-\textbf{Total (2021--2025)} & \textbf{48.8} & \textbf{198.82} & \textbf{-150.02} \\
+\textbf{Total (2021--2025)} & \textbf{44.0} & \textbf{198.82} & \textbf{-154.82} \\
 \textbf{Max drawdown} & \textbf{-8.0} & \textbf{-77.57} & \textbf{+69.57} \\
 \end{longtable}
 
-\emph{Note: S12 iter 5502 returns are from the deployment simulation with modeled costs (0.20 \% fee + 0.10 \% slippage) and independent yearly resets (EUR~500 per year). BTC/USDC buy-and-hold returns are computed from Binance daily close prices and ignore funding and custody costs. Max drawdown for buy-and-hold is the largest peak-to-trough decline over 2021--2025.}
+\emph{Note: S12 iter 5502 returns are from the deployment simulation with modeled costs (0.20 \% fee + 0.10 \% slippage) and independent yearly resets (EUR~500 per year); the total is therefore the simple sum of the annual returns, not a compounded multi-year return. BTC/USDC buy-and-hold returns are computed from Binance daily close prices and ignore funding and custody costs. Max drawdown for buy-and-hold is the largest peak-to-trough decline over 2021--2025.}
 
 \begin{figure}[H]
 \centering
@@ -553,7 +554,7 @@ The lower holdout Sharpe relative to S11 reflects Bitcoin's different volatility
 
 \subsection{Feature importance and parameter sensitivity}\label{feature-importance-and-parameter-sensitivity}
 
-Figure 5 shows the top features for S12 iter 5502. Stochastic RSI and ADX at the daily and 15-minute timeframes dominate, followed by EMA differences and Bollinger Band width. The multi-timeframe pattern matches the findings of [30] for Bitcoin prediction: short-term momentum and medium-term trend strength carry complementary information. Reference [30] is by the same first author and shares the OHLCV data source and multi-timeframe feature-engineering approach; we cite it because it documents the same empirical regularity, not as independent validation.
+Figure 5 shows the top features for S12 iter 5502. Stochastic RSI and ADX at the daily and 15-minute timeframes dominate, followed by EMA differences and Bollinger Band width. The multi-timeframe pattern matches the findings of \citep{sobreiro_2026} for Bitcoin prediction: short-term momentum and medium-term trend strength carry complementary information. \citep{sobreiro_2026} is by the same first author and shares the OHLCV data source and multi-timeframe feature-engineering approach; we cite it because it documents the same empirical regularity, not as independent validation.
 
 \begin{figure}[H]
 \centering
@@ -579,7 +580,7 @@ Figure~7 shows the sensitivity of S12 iter 5502 to round-trip transaction costs.
 \caption{Cost sensitivity --- S12 iter 5502.\label{fig6}}
 \end{figure}
 
-\textbf{Exit-slippage stress-test.} The baseline backtest applies 0.10 \% slippage on entry but assumes stop-loss, take-profit, and end-of-period exits execute at the triggered level. Table~8a shows the sensitivity of the two case studies to additional symmetric slippage on all exits. Even with an additional 0.30 \% slippage on every exit, both strategies remain profitable on the passive holdout, so the results are not driven by the zero-exit-slippage assumption alone. The S11 case is particularly robust because its wide stop-loss (7.8 \%) and take-profit (7.1 \%) levels mean that small exit slippages are a modest fraction of the expected trade return; the S12 case degrades more quickly because its similarly wide exits are applied to a more volatile asset.
+\textbf{Exit-slippage stress-test.} The baseline backtest applies 0.10 \% slippage on entry but assumes stop-loss, take-profit, and end-of-period exits execute at the triggered level. Table~\ref{tab:exit-slippage-stress-test} shows the sensitivity of the two case studies to additional symmetric slippage on all exits. Even with an additional 0.30 \% slippage on every exit, both strategies remain profitable on the passive holdout, so the results are not driven by the zero-exit-slippage assumption alone. The S11 case is particularly robust because its wide stop-loss (7.8 \%) and take-profit (7.1 \%) levels mean that small exit slippages are a modest fraction of the expected trade return; the S12 case degrades more quickly because its similarly wide exits are applied to a more volatile asset.
 
 \begin{longtable}[]{@{}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}
@@ -589,7 +590,7 @@ Figure~7 shows the sensitivity of S12 iter 5502 to round-trip transaction costs.
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1429}}@{}}
-\caption{Exit-slippage stress-test}\\
+\caption{Exit-slippage stress-test}\label{tab:exit-slippage-stress-test}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedleft
 Exit slippage (\%)
@@ -618,7 +619,7 @@ S12 total return (\%)
 
 \emph{Note: Entry slippage is fixed at 0.10 \% and the round-trip fee at 0.20 \%. Exit slippage is applied symmetrically to stop-loss, take-profit, and end-of-period exits. S11 values cover 2022--2026; S12 values cover 2021--2025. Total return is the simple sum of annual returns with independent yearly resets (EUR~500 per year).}
 
-Figure~8 reports mean trade return by ADX regime. The strategy performs best in trending markets (ADX 20--40) and strong-trend markets (ADX \textgreater{} 40), while staying roughly flat in weak-trend/lateral regimes. Table~6 reports the trade counts underlying these means; the reliability of the weak-trend estimate is low because few or no trades occur in that bin. This pattern matches the ADX filter [34] embedded in the feature set and the broader class of regime-switching models that partition returns by state variables [14].
+Figure~8 reports mean trade return by ADX regime. The strategy performs best in trending markets (ADX 20--40) and strong-trend markets (ADX \textgreater{} 40), while staying roughly flat in weak-trend/lateral regimes. Table~\ref{tab:adx-regime-trades} reports the trade counts underlying these means; the reliability of the weak-trend estimate is low because few or no trades occur in that bin. This pattern matches the ADX filter \citep{wilder_1978} embedded in the feature set and the broader class of regime-switching models that partition returns by state variables \citep{hamilton_1989}.
 
 \begin{figure}[H]
 \centering
@@ -626,7 +627,7 @@ Figure~8 reports mean trade return by ADX regime. The strategy performs best in 
 \caption{Performance by market regime --- S12 iter 5502.\label{fig7}}
 \end{figure}
 
-\textbf{Trade counts by ADX regime.} Table 6 reports the trade counts underlying the regime means.
+\textbf{Trade counts by ADX regime.} Table~\ref{tab:adx-regime-trades} reports the trade counts underlying the regime means.
 
 
 \begin{longtable}[]{@{}
@@ -638,7 +639,7 @@ Figure~8 reports mean trade return by ADX regime. The strategy performs best in 
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}@{}}
-\caption{Trade counts by ADX regime}\\
+\caption{Trade counts by ADX regime}\label{tab:adx-regime-trades}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 ADX regime
@@ -670,13 +671,13 @@ Strong trend & ADX $\geq$ 40 & 16 & 3.18 & 75.0 & 126 & 3.33 & 69.8 \\
 
 \subsection{Statistical rigor}\label{statistical-rigor}
 
-All Sharpe ratios reported by the engine and in this section are computed from daily equity changes and annualised with $\sqrt{365}$, the standard convention for cryptocurrency markets. We compute this ratio in two ways. The \textbf{active-day Sharpe} uses only days with at least one closed position, discarding inactive days; it is the metric the backtest engine optimizes and is reported in Tables~1 and~3 to match the engine output. The \textbf{calendar-time Sharpe} uses the full daily equity curve, including all zero-return inactive days; it is the more conservative headline metric because it reflects the experience of a continuously invested account. The calendar-time values are lower than the active-day values (see Table~1) and should be treated as the primary descriptive evidence for risk-adjusted performance.
+All Sharpe ratios reported by the engine and in this section are computed from daily equity changes and annualised with $\sqrt{365}$, the standard convention for cryptocurrency markets. We compute this ratio in two ways. The \textbf{active-day Sharpe} uses only days with at least one closed position, discarding inactive days; it is the metric the backtest engine optimizes and is reported in Tables~\ref{tab:case-study-strategies} and~\ref{tab:s11-annual-performance} to match the engine output. The \textbf{calendar-time Sharpe} uses the full daily equity curve, including all zero-return inactive days; it is the more conservative headline metric because it reflects the experience of a continuously invested account. The calendar-time values are lower than the active-day values (see Table~\ref{tab:case-study-strategies}) and should be treated as the primary descriptive evidence for risk-adjusted performance.
 
-Table~7 reports active-day Sharpe ratios, bootstrap p-values, approximate Deflated Sharpe Ratios (DSR), and percentile bootstrap 95~\% confidence intervals for the three main case studies. Calendar-time Sharpe values are reported in Table~1. These statistics are intended as \textbf{descriptive diagnostics} of the strategies' holdout behavior, not as inferential guarantees or proof that the strategies will generalize. The bootstrap procedure tests the null hypothesis \(H_0: \mu \le 0\) against the one-sided alternative \(H_1: \mu > 0\), where \(\mu\) is the mean daily return on active trading days (days with at least one closed position). Both S11 models reject \(H_0\) at \(p < 0.0001\), and S12 rejects at \(p = 0.0012\). The approximate DSR values, which adjust for the raw number of trials in each season and for non-normality, remain positive: 11.78 for S11 iter 1077 and 3.24 for S12 iter 5502. These values should be interpreted as \textbf{optimistic upper bounds} because the DSR does not correct for the cross-season meta-search.
+Table~\ref{tab:bootstrap-dsr} reports active-day Sharpe ratios, bootstrap p-values, approximate Deflated Sharpe Ratios (DSR), and percentile bootstrap 95~\% confidence intervals for the three main case studies. Calendar-time Sharpe values are reported in Table~\ref{tab:case-study-strategies}. These statistics are intended as \textbf{descriptive diagnostics} of the strategies' holdout behavior, not as inferential guarantees or proof that the strategies will generalize. The bootstrap procedure tests the null hypothesis \(H_0: \mu \le 0\) against the one-sided alternative \(H_1: \mu > 0\), where \(\mu\) is the mean daily return on active trading days (days with at least one closed position). Both S11 models reject \(H_0\) at \(p < 0.0001\), and S12 rejects at \(p = 0.0012\). The approximate DSR values, which adjust for the raw number of trials in each season and for non-normality, remain positive: 11.78 for S11 iter 1077 and 3.24 for S12 iter 5502. These values should be interpreted as \textbf{optimistic upper bounds} because the DSR does not correct for the cross-season meta-search.
 
-These statistics must be interpreted with their assumptions in mind. The bootstrap p-value relies on the sample of active trading days being representative of the strategy's future daily return distribution. This assumption is questionable for three reasons. First, the sample is conditional on days with at least one closed trade, so it omits inactive days and may overstate precision. Second, the number of active trading days is small (45--63), so the sampling distribution is noisy; the 95 \% bootstrap confidence intervals for the Sharpe ratio are wide (Table 7). Third, daily returns on active trading days are not independent: ACF(1) ranges from -0.24 to 0.18, and Jarque-Bera tests reject normality for the two S11 cases (p $\leq$ 0.0003). We therefore treat the p-values and DSR values as descriptive indicators rather than as exact frequentist probabilities or guarantees of future performance.
+These statistics must be interpreted with their assumptions in mind. The bootstrap p-value relies on the sample of active trading days being representative of the strategy's future daily return distribution. This assumption is questionable for three reasons. First, the sample is conditional on days with at least one closed trade, so it omits inactive days and may overstate precision. Second, the number of active trading days is small (45--63), so the sampling distribution is noisy; the 95 \% bootstrap confidence intervals for the Sharpe ratio are wide (Table~\ref{tab:bootstrap-dsr}). Third, daily returns on active trading days are not independent: ACF(1) ranges from -0.24 to 0.18, and Jarque-Bera tests reject normality for the two S11 cases (p $\leq$ 0.0003). We therefore treat the p-values and DSR values as descriptive indicators rather than as exact frequentist probabilities or guarantees of future performance.
 
-The approximate DSR is computed as follows. First, the variance of the Sharpe ratio under the null is adjusted for skewness and kurtosis following [26]:
+The approximate DSR is computed as follows. First, the variance of the Sharpe ratio under the null is adjusted for skewness and kurtosis following \citep{mertens_2002}:
 
 \[\widehat{\mathrm{Var}}(\mathrm{SR}) = \frac{1 - \hat{\gamma}_3 \cdot \mathrm{SR} + \frac{\hat{\gamma}_4 - 1}{4} \mathrm{SR}^2}{N - 1},\]
 
@@ -684,9 +685,9 @@ where \(\hat{\gamma}_3\) and \(\hat{\gamma}_4\) are the sample skewness and kurt
 
 \[\mathrm{DSR} \approx \Phi^{-1}(1 - p_K) \cdot \sqrt{\widehat{\mathrm{Var}}(\mathrm{SR})}.\]
 
-For S11 iter 1077, \(K = 3\,797\) and \(N = 45\) active trading days; for S12 iter 5502, \(K = 9\,957\) and \(N = 53\) active trading days. Because strategies share features and hyper-parameter ranges, the effective number of independent trials is smaller than the raw iteration count; therefore these DSR values should be interpreted as an upper bound on the correction rather than as exact Bailey--López de Prado probabilities. One difference is that Bailey and López de Prado [6] frame the Deflated Sharpe Ratio as the minimum significant Sharpe threshold that survives a multiple-testing correction, whereas the quantity reported here maps the Bonferroni-corrected p-value back onto the Sharpe scale for comparability with the raw Sharpe.
+For S11 iter 1077, \(K = 3\,797\) and \(N = 45\) active trading days; for S12 iter 5502, \(K = 9\,957\) and \(N = 53\) active trading days. Because strategies share features and hyper-parameter ranges, the effective number of independent trials is smaller than the raw iteration count; therefore these DSR values should be interpreted as an upper bound on the correction rather than as exact Bailey--López de Prado probabilities. One difference is that Bailey and López de Prado \citep{bailey_2014} frame the Deflated Sharpe Ratio as the minimum significant Sharpe threshold that survives a multiple-testing correction, whereas the quantity reported here maps the Bonferroni-corrected p-value back onto the Sharpe scale for comparability with the raw Sharpe.
 
-Finally, the single-season DSR and bootstrap p-values do not account for the outer meta-search across twelve seasons. Each season's gates and scoring weights were updated after observing prior holdout results, so the cross-season design itself consumes out-of-sample information. The reported DSR values are therefore optimistic bounds; a fully conservative accounting would require a protocol-level multiple-testing correction (e.g., [28]) that is left for future work. We report the uncorrected diagnostics in Table~7 with this caveat and do not use them to support claims of predictive skill.
+Finally, the single-season DSR and bootstrap p-values do not account for the outer meta-search across twelve seasons. Each season's gates and scoring weights were updated after observing prior holdout results, so the cross-season design itself consumes out-of-sample information. The reported DSR values are therefore optimistic bounds; a fully conservative accounting would require a protocol-level multiple-testing correction (e.g., \citep{white_2000}) that is left for future work. We report the uncorrected diagnostics in Table~\ref{tab:bootstrap-dsr} with this caveat and do not use them to support claims of predictive skill.
 
 
 \begin{longtable}[]{@{}
@@ -700,7 +701,7 @@ Finally, the single-season DSR and bootstrap p-values do not account for the out
   >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1026}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1026}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1026}}@{}}
-\caption{Bootstrap p-values, approximate Deflated Sharpe Ratios, and 95~\% confidence intervals}\\
+\caption{Bootstrap p-values, approximate Deflated Sharpe Ratios, and 95~\% confidence intervals}\label{tab:bootstrap-dsr}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Case
@@ -736,7 +737,7 @@ S12 iter 5502 & 7.80 & {[}2.59, 13.65{]} & 0.0012 & {[}0.0005, 0.0019{]} & 3.24 
 
 \subsection{Temporal robustness and data-snooping considerations}\label{temporal-robustness-and-data-snooping-considerations}
 
-The reported profitability in every calendar year (Tables~3 and~4) is based on a small sample of annual blocks (five years per strategy) and a low number of trades per year (four to eighty-two), and should not be mistaken for independent out-of-sample evidence. The LLM's feature proposals and the season acceptance gates were both informed by earlier seasons, so the design itself consumes out-of-sample information through an outer meta-search loop. The single-season bootstrap p-values and DSR values in Table~7 do not correct for this cross-season selection and are based on only 45--63 active trading days.
+The reported profitability in every calendar year (Tables~\ref{tab:s11-annual-performance} and~\ref{tab:s12-annual-performance}) is based on a small sample of annual blocks (five years per strategy) and a low number of trades per year (four to eighty-two), and should not be mistaken for independent out-of-sample evidence. The LLM's feature proposals and the season acceptance gates were both informed by earlier seasons, so the design itself consumes out-of-sample information through an outer meta-search loop. The single-season bootstrap p-values and DSR values in Table~\ref{tab:bootstrap-dsr} do not correct for this cross-season selection and are based on only 45--63 active trading days.
 
 We therefore distinguish three levels of evidence, in decreasing order of strength:
 
@@ -752,7 +753,7 @@ We therefore distinguish three levels of evidence, in decreasing order of streng
 
 The evidence supports the narrower conclusion that the selected strategies are not trivial artifacts of in-sample curve fitting; it does not support unconditional claims about future performance.
 
-Table 10 reports a temporal-robustness check on quarterly, semester, annual, and rolling 12-month windows. Annual windows are profitable for both strategies (Sharpe \textgreater{} 0 in 100 \% of windows), but shorter windows are noisier: only 59 \% and 60 \% of quarterly windows are positive for S11 and S12 respectively. This pattern is expected for a low-frequency strategy and cautions against over-interpreting any single short window.
+Table~\ref{tab:temporal-robustness-windows} reports a temporal-robustness check on quarterly, semester, annual, and rolling 12-month windows. Annual windows are profitable for both strategies (Sharpe \textgreater{} 0 in 100 \% of windows), but shorter windows are noisier: only 59 \% and 60 \% of quarterly windows are positive for S11 and S12 respectively. This pattern is expected for a low-frequency strategy and cautions against over-interpreting any single short window.
 
 \subsection{Temporal robustness across alternative window definitions}\label{table-10-temporal-robustness-across-alternative-window-definitions}
 
@@ -765,7 +766,7 @@ Table 10 reports a temporal-robustness check on quarterly, semester, annual, and
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 14\tabcolsep) * \real{0.1333}}@{}}
-\caption{Temporal robustness of Sharpe ratios across window definitions}\\
+\caption{Temporal robustness of Sharpe ratios across window definitions}\label{tab:temporal-robustness-windows}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Window type
@@ -808,7 +809,7 @@ A natural question is whether the LLM proposal step adds value beyond a simpler 
 
 \subsubsection{Design}
 
-Table~9 reports two baselines. The \emph{random SL/TP/threshold} baseline fixes the LLM-selected feature set and draws 200 \((\mathrm{SL}, \mathrm{TP}, \mathrm{threshold})\) triples at random from the same ranges used by Optuna. The \emph{random-feature} baseline fixes the final SL/TP/threshold values from the LLM configuration and draws eight random feature subsets from the catalog, training a fresh XGBoost classifier for each subset and then running a 30-trial random search over SL/TP/threshold. All backtests use \texttt{max\_pos\ =\ 5} and modeled costs of 0.20 \% fee plus 0.10 \% slippage; the 2024--2025 holdout window is never used for training or risk-parameter optimization.
+Table~\ref{tab:ablation-study} reports two baselines. The \emph{random SL/TP/threshold} baseline fixes the LLM-selected feature set and draws 200 \((\mathrm{SL}, \mathrm{TP}, \mathrm{threshold})\) triples at random from the same ranges used by Optuna. The \emph{random-feature} baseline fixes the final SL/TP/threshold values from the LLM configuration and draws eight random feature subsets from the catalog, training a fresh XGBoost classifier for each subset and then running a 30-trial random search over SL/TP/threshold. All backtests use \texttt{max\_pos\ =\ 5} and modeled costs of 0.20 \% fee plus 0.10 \% slippage; the 2024--2025 holdout window is never used for training or risk-parameter optimization.
 
 \subsubsection{Results}
 
@@ -831,7 +832,7 @@ Three caveats apply. First, the random-feature sample is small and the risk-para
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1600}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1600}}
   >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1600}}@{}}
-\caption{Ablation study: random baselines versus LLM-selected configuration (S12 iter 5502)}\\
+\caption{Ablation study: random baselines versus LLM-selected configuration (S12 iter 5502)}\label{tab:ablation-study}\\
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Baseline
@@ -867,13 +868,13 @@ The results show that a research system incorporating an LLM agent can generate 
 
 \textbf{Economic interpretation of the selected signals.} The S11 and S12 models rely on a small set of technical indicators. \emph{Stochastic RSI} and \emph{EMA differences} capture short- and medium-term momentum dynamics; in cryptocurrency markets, where retail flow and momentum strategies are common, these variables may proxy for lagged order-flow pressure \citep{sobreiro_2026}. \emph{ADX} measures trend strength and is used both as an entry filter and implicitly through the feature set, aligning the strategy with periods when directional persistence is more likely. \emph{Bollinger Band width} and \emph{ATR} quantify volatility compression and expansion; the volatility kill-switch prevents entries when realised volatility spikes, protecting the strategy from adverse gap risk. None of these signals is novel individually; the contribution is the automated, leakage-aware process that combines them and rejects configurations that fail out-of-sample gates.
 
-\textbf{Value proposition relative to buy-and-hold.} Tables 5 and 8 show that the selected strategies underperform buy-and-hold in strong bull years. This is expected: the strategies are long-only, trade infrequently, and use stop-losses that cap upside during rapid rallies. The practical claim is therefore not total-return dominance, but drawdown control and positive returns in bear or sideways regimes. The S11 strategy's maximum drawdown of -6.74 \% versus -62.90 \% for buy-and-hold, and the S12 strategy's -8.0 \% versus -77.57 \%, show this risk-management profile. Whether this profile is attractive depends on the investor's marginal utility: a risk-averse holder seeking to limit downside may prefer the smoother equity curve, while an investor maximizing expected wealth would prefer the unlevered benchmark.
+\textbf{Value proposition relative to buy-and-hold.} Tables~\ref{tab:s11-benchmark} and~\ref{tab:s12-benchmark} show that the selected strategies underperform buy-and-hold in strong bull years. This is expected: the strategies are long-only, trade infrequently, and use stop-losses that cap upside during rapid rallies. The practical claim is therefore not total-return dominance, but drawdown control and positive returns in bear or sideways regimes. The S11 strategy's maximum drawdown of -6.74 \% versus -62.90 \% for buy-and-hold, and the S12 strategy's -8.0 \% versus -77.57 \%, show this risk-management profile. Whether this profile is attractive depends on the investor's marginal utility: a risk-averse holder seeking to limit downside may prefer the smoother equity curve, while an investor maximizing expected wealth would prefer the unlevered benchmark.
 
 \textbf{The role of the LLM in light of the ablation is to generate, not to discover.} The ablation results in Section~4.8 change how we interpret the LLM's role. Random feature subsets and random risk parameters can produce holdout performance comparable to, or even better than, the LLM-selected configuration in the S12 case study. This does not mean the LLM is unnecessary---it generates the syntactically valid, catalog-compliant candidates that the validation layer then filters---but it does mean that the scientific contribution is the validation and governance architecture, not a claim of superhuman feature discovery. The LLM functions here as a \textbf{high-volume proposal generator}; the pipeline converts a large volume of such proposals into a small set of testable strategies, and the statistical safeguards are what make that conversion credible. This finding is consistent with a broader pattern in the recent literature, where highly automated, self-evolving trading systems can diverge sharply between validation and live performance \citep{chen_2025_redqueen}: the differentiator is not the strength of the proposal engine but the discipline with which its output is filtered.
 
 \subsection{Limitations}\label{limitations}
 
-The study has several limitations. First, the number of trades per strategy is low (tens to low-hundreds over several years), which increases sampling variance in daily return statistics; consequently, the bootstrap p-values in Table~7, though based on 10\,000 resamples, should be interpreted with caution because they are computed from 45--63 non-i.i.d.~daily observations with wide confidence intervals. The reported Sharpe ratios are active-day ratios; calendar-time Sharpe, which includes all inactive days, is the more conservative headline metric and should be preferred for risk-adjusted comparisons.
+The study has several limitations. First, the number of trades per strategy is low (tens to low-hundreds over several years), which increases sampling variance in daily return statistics; consequently, the bootstrap p-values in Table~\ref{tab:bootstrap-dsr}, though based on 10\,000 resamples, should be interpreted with caution because they are computed from 45--63 non-i.i.d.~daily observations with wide confidence intervals. The reported Sharpe ratios are active-day ratios; calendar-time Sharpe, which includes all inactive days, is the more conservative headline metric and should be preferred for risk-adjusted comparisons.
 
 Second, the January--March 2026 period for S11 is short (three months, four trades) and was used to select the production model from 30 re-evaluated candidates. It is therefore a secondary selection holdout rather than an independent prospective test, and its Sharpe should be treated as a noisy post-selection observation.
 

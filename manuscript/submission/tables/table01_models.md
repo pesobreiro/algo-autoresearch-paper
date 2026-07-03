@@ -11,7 +11,8 @@
 | Validation Sharpe | 1.69 | 1.39 |
 | Holdout Sharpe | 2.87 | 1.15 |
 | True OOS Sharpe | 4.17 | — |
-| Total return (2022–2026) | 58.2 % (simple sum of annual returns) | 27.7 % (2021–2025) |
+| Total return (2022–2026) | 58.2 % (simple sum of annual returns) | 44.0 % (2021–2025, simple sum) |
+| Holdout return (2024–2025) | — | 27.7 % (compounded) |
 | Maximum drawdown | −6.74 % | −8.1 % |
 | Average win rate | 65.9–91.7 % | 90.9 % |
 | Number of trades | 161 (2022–2026) | 38 (2021–2025) |
