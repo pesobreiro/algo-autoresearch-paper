@@ -294,7 +294,7 @@ The experiments were run on a local workstation with a consumer GPU serving the 
 
 To enable independent replication, we fixed the software environment, random seeds, data sources, and execution flow described below. All code, experiment logs, and generated artifacts are available in the repository associated with this submission.
 
-\textbf{Persistent archive.} All code, experiment logs, and generated artifacts are publicly available at \url{https://github.com/pesobreiro/algo-autoresearch-paper} (MIT license) and are permanently archived at Zenodo (DOI: \url{https://doi.org/10.5281/zenodo.21160588}).
+\textbf{Persistent archive.} All code, experiment logs, and generated artifacts are publicly available at \url{https://github.com/pesobreiro/algo-autoresearch-paper} (MIT license) and are permanently archived at Zenodo (DOI: \url{https://doi.org/10.5281/zenodo.21160587}).
 
 \textbf{Software environment.} The pipeline was executed under Python 3.13.11 with the following core package versions: pandas 3.0.1, NumPy 2.4.3, Numba 0.65.1, XGBoost 3.3.0, scikit-learn 1.9.0, Optuna 4.9.0, Joblib 1.5.3, PyArrow 12.0 or later, and llama.cpp serving Qwen2.5-7B-Instruct (quantized GGUF, Q4\_K\_M). The multi-timeframe feature-merge module is imported from \texttt{features.technical} (commit hash recorded in \texttt{requirements.txt}). The full dependency list is in \texttt{requirements.txt}. We recommend creating a dedicated virtual environment and installing the pinned versions; newer versions may alter random number generation or sampler behavior and are not guaranteed to reproduce the exact numeric results reported here.
 
@@ -927,7 +927,7 @@ The findings support a narrow claim: LLMs can accelerate prescriptive-analytics 
 \vspace{6pt}
 
 % Declarations
-\dataavailability{The code, experiment logs, and trained model artifacts supporting this study are openly available at Zenodo, DOI: 10.5281/zenodo.21160588 (\url{https://doi.org/10.5281/zenodo.21160588}), and at \url{https://github.com/pesobreiro/algo-autoresearch-paper}.
+\dataavailability{The code, experiment logs, and trained model artifacts supporting this study are openly available at Zenodo, DOI: 10.5281/zenodo.21160587 (\url{https://doi.org/10.5281/zenodo.21160587}), and at \url{https://github.com/pesobreiro/algo-autoresearch-paper}.
 
 To reproduce the two case studies: (1) install the pinned Python environment listed in \texttt{requirements.txt}; (2) download 15-minute, 4-hour, and daily OHLCV bars for BNB/USDT and BTC/USDT from the Binance public API; (3) start the local Qwen2.5-7B-Instruct GGUF server via llama.cpp; (4) run \texttt{python main.py} for the desired season; (5) for the selected iterations, run \texttt{deployment/evaluate\_models.py} and \texttt{deployment/backtest\_deploy.py} using the saved model and parameters in \texttt{best\_models/season\_\{N\}/iter\_\{XXXX\}/}. A \texttt{download\_data.py} helper script that performs the exact Binance API calls used in this study is included in the repository. Byte-identical reproduction across operating systems is not guaranteed because of Numba JIT compilation and BLAS threading; the statistical conclusions, however, are robust to the residual non-determinism.}
 
