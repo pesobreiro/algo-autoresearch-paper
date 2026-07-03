@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 2026-07-03 — Release v1.0.2
+
+### Fixed
+- Corrected citation attribution in the selection-bias calculation: now cites the Extreme Value Theory framework (Bailey \& López de Prado, 2014) rather than paired Sharpe-ratio inference tests (Jobson \& Korkie, 1981; Ledoit \& Wolf, 2008), which address a different statistical problem.
+- Removed two unused bibliography entries (`athey_2019`, `mertens_2002`) flagged during final review.
+
+## 2026-07-03 — Release v1.0.1
+
+### Fixed
+- Corrected the asset pair for the Season 12 cross-asset replication case study from BTC/USDC to BTC/USDT throughout the main manuscript (`mdpi_manuscript.tex`, PDF, and tables) to match the actual Binance data (`BTCUSDT`).
+- Restored the corrected manuscript after an accidental regression in commits `f4c9458` and `43f3a2b` had reverted table numbering, citations, US spelling, and the S12 return correction.
+- Reconciled the Acknowledgments section with the Use of Artificial Intelligence Tools statement.
+- Updated `kou_2024`, `wang_2023`, and `deeparies_2025` bibliography entries to their peer-reviewed publication venues (EMNLP 2025 Findings, EMNLP 2025 System Demonstrations, and CIKM 2025).
+- Fixed table numbering, resolved named citations, and enforced US English spelling in the main manuscript.
+- Streamlined README wording and removed generic phrasing.
+
+### Changed
+- Updated author contributions and funding statement; added Antonio Pratas as last author with ORCID.
+
+## 2026-07-03 — Release v1.0.0
+
+### Added
+- Initial public release accompanying the MDPI Analytics submission: source manuscript (`mdpi_manuscript.tex`), figures, tables, cover letter, highlights, declarations, and supporting code.
+- Zenodo archival snapshot with DOI 10.5281/zenodo.21160588.
+
 ## 2026-06-26 — Manuscript normalization and MDPI Analytics submission package
 
 ### Changed
