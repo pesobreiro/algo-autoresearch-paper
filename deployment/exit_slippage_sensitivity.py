@@ -224,7 +224,7 @@ def main():
     s12 = evaluate_case(
         season=12, iter_num=5502, sl=9.7, tp=9.1, thr=0.890,
         ticker='btc', years=[2021, 2022, 2023, 2024, 2025],
-        label='S12 iter 5502 (BTC/USDC)')
+        label='S12 iter 5502 (BTC/USDT)')
 
     # Save results
     out_dir = BASE_DIR / 'deployment/results'

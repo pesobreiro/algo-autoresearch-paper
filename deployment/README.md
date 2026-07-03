@@ -48,9 +48,9 @@ best_models/season_11/iter_1077/
 
 ---
 
-## Model 2 — S12 iter 5502 — BTC/USDC — candidate
+## Model 2 — S12 iter 5502 — BTC/USDT — candidate
 
-**Iter 5502** — Season 12 — BTC/USDC 15m
+**Iter 5502** — Season 12 — BTC/USDT 15m
 
 ```
 SL=9.70%  TP=9.12%  Threshold=0.890  ADX_min=25

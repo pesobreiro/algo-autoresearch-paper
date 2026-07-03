@@ -1,4 +1,4 @@
-## Table 4. Annual performance of the cross-asset replication (S12 iter 5502, BTC/USDC)
+## Table 4. Annual performance of the cross-asset replication (S12 iter 5502, BTC/USDT)
 
 | Year | Return (%) | Sharpe | Max DD (%) | Trades | Win rate (%) |
 |------|-----------:|-------:|-----------:|-------:|-------------:|

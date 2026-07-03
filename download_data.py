@@ -2,7 +2,7 @@
 download_data.py
 
 Helper script to reproduce the OHLCV dataset used in this study.
-Downloads 15-minute, 4-hour, and daily klines for BNB/USDT and BTC/USDC
+Downloads 15-minute, 4-hour, and daily klines for BNB/USDT and BTC/USDT
 from the Binance public API and stores them as Parquet files.
 
 Usage:
@@ -21,7 +21,7 @@ API = "https://api.binance.com/api/v3/klines"
 
 TICKERS = {
     "bnb": "BNBUSDT",
-    "btc": "BTCUSDC",
+    "btc": "BTCUSDT",
 }
 
 TIMEFRAMES = {

@@ -2,7 +2,7 @@
 
 | Feature | S11 iter 1077 (production) | S12 iter 5502 (BTC replication) |
 |---|---|---|
-| Asset | BNB/USDT | BTC/USDC |
+| Asset | BNB/USDT | BTC/USDT |
 | Training period | 2022–2023 | 2017–2020 |
 | Validation period | 2022–2024 (walk-forward) | 2021–2023 |
 | Holdout period | 2025 | 2024–2025 |

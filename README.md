@@ -7,7 +7,7 @@ Code, data specification, and reproducibility artifacts for *A Season-Structured
 - `autoresearch/` — autonomous LLM-driven strategy generation and validation loop.
 - `pipeline/` — feature engineering, label generation, XGBoost training, and Optuna backtest.
 - `deployment/` — scripts to re-run and stress-test the two accepted case studies.
-- `best_models/` — final accepted models for S11 iter 1077 (BNB/USDT) and S12 iter 5502 (BTC/USDC).
+- `best_models/` — final accepted models for S11 iter 1077 (BNB/USDT) and S12 iter 5502 (BTC/USDT).
 - `manuscript/submission/` — paper source, figures, and tables.
 - `llm/` — instructions to build llama.cpp and serve the local Qwen2.5-7B-Instruct model.
 

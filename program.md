@@ -4,7 +4,7 @@ This file guides the LLM agent in its parameter-modification decisions.
 
 ---
 
-## Season 12 — BTC/USDC — Completed
+## Season 12 — BTC/USDT — Completed
 
 **107 accepted** in ~9900 iterations. Selected deploy model: **iter 5502**.
 

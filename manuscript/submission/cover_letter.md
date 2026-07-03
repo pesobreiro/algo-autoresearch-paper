@@ -8,7 +8,7 @@ Our contributions are:
 
 1. A mixed-initiative design: full autonomy inside seasons, human oversight at transitions.
 2. A layered validation protocol with syntax checking, AST-based future-leak detection, catalog compliance, and strict out-of-sample evaluation.
-3. Empirical results from 34 333 candidate strategies and 329 accepted strategies, including a selected BNB/USDT case study and a cross-asset BTC/USDC replication, with bootstrap diagnostics and an explicit discussion of the Q1 2026 post-selection observation.
+3. Empirical results from 34 333 candidate strategies and 329 accepted strategies, including a selected BNB/USDT case study and a cross-asset BTC/USDT replication, with bootstrap diagnostics and an explicit discussion of the Q1 2026 post-selection observation.
 4. An ablation study suggesting the pipeline's value comes from systematic validation and rejection of unsound candidates, not from uniquely superior LLM feature selection, plus an explicit discussion of limitations and the distinction between passive holdout, secondary-selection holdout, and cross-season generalization.
 
 We confirm that the manuscript is not under consideration or published elsewhere. All authors have approved the submission.

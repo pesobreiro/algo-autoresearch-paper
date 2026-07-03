@@ -15,7 +15,7 @@
 ### Added
 - `manuscript/submission/` package with `manuscript.md`, `manuscript.tex`, `figures/`, `tables/`, `cover_letter.md`, `highlights.md`, `declarations.md`, and `README_submission.md`.
 
-## 2026-03-25 — Season 12 — BTC/USDC — Conclusion and Deploy
+## 2026-03-25 — Season 12 — BTC/USDT — Conclusion and Deploy
 
 ### S12 Results
 - **107 accepted** in ~9900 iterations (1.1% acceptance rate)
