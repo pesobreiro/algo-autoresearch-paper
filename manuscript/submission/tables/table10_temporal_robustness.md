@@ -13,5 +13,5 @@
 annual windows are calendar years; rolling 12-month windows start on 1
 January of each available year. The number of windows differs because
 S11 spans 2022–2026 (with partial 2026 data) and S12 spans 2021–2025.
-Sharpe ratios are computed from daily equity changes annualised with
+Sharpe ratios are computed from daily equity changes annualized with
 $\sqrt{365}$.

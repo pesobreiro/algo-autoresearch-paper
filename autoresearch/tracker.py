@@ -45,7 +45,7 @@ class ExperimentRecord:
     iteracao: int
     timestamp_iso: str
     git_commit: str
-    status: str  # "aceite" | "rejeitado" | "erro"
+    status: str  # "accepted" | "rejected" | "error"
     metricas: dict
     params_hash: str
     labels_reutilizados: bool

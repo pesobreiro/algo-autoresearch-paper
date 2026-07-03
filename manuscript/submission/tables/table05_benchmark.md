@@ -10,4 +10,4 @@
 | **Total (2022–Mar 2026)** | **58.20** | **17.09** | **+41.11** |
 | **Max drawdown** | **−6.74** | **−62.90** | **+56.16** |
 
-*Note: S11 iter 1077 returns are from the deployment simulation (`evaluate_models.py`) with modelled costs 0.20 % fee + 0.10 % slippage. BNB/USDT buy-and-hold returns are computed from daily close prices downloaded from the Binance public API; they ignore funding, staking, and custody costs. The 2026 buy-and-hold figure covers 1 January–31 March 2026.*
+*Note: S11 iter 1077 returns are from the deployment simulation (`evaluate_models.py`) with modeled costs 0.20 % fee + 0.10 % slippage. BNB/USDT buy-and-hold returns are computed from daily close prices downloaded from the Binance public API; they ignore funding, staking, and custody costs. The 2026 buy-and-hold figure covers 1 January–31 March 2026.*

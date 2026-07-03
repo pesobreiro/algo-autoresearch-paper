@@ -10,4 +10,4 @@
 | **Total (2021–2025)** | **48.8** | **198.82** | **−150.02** |
 | **Max drawdown** | **−8.0** | **−77.57** | **+69.57** |
 
-*Note: S12 iter 5502 returns are from the deployment simulation with modelled costs (0.20 % fee + 0.10 % slippage) and independent yearly resets (€500 per year). BTC/USDC buy-and-hold returns are computed from Binance daily close prices and ignore funding and custody costs. Max drawdown for buy-and-hold is the largest peak-to-trough decline over 2021–2025.*
+*Note: S12 iter 5502 returns are from the deployment simulation with modeled costs (0.20 % fee + 0.10 % slippage) and independent yearly resets (€500 per year). BTC/USDC buy-and-hold returns are computed from Binance daily close prices and ignore funding and custody costs. Max drawdown for buy-and-hold is the largest peak-to-trough decline over 2021–2025.*

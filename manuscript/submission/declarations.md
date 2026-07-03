@@ -16,7 +16,7 @@ Not applicable. This research did not involve human subjects.
 
 ## Author Contributions (CRediT)
 
-Conceptualisation, methodology, software, validation, formal analysis, investigation, data curation, writing — original draft, writing — review and editing, visualisation, supervision: Pedro Sobreiro.
+Conceptualization, methodology, software, validation, formal analysis, investigation, data curation, writing — original draft, writing — review and editing, visualization, supervision: Pedro Sobreiro.
 
 ## Conflict of Interest Statement
 
@@ -30,7 +30,7 @@ No external funding was received for this research.
 
 Parts of the code-generation and text-revision workflow were assisted by a locally deployed large language model (Qwen2.5-7B-Instruct via llama.cpp). The LLM proposed candidate strategies and drafting suggestions; all methodology, validation, statistical analysis, and final editorial decisions remained under human control.
 
-The table below summarises the LLM involvement by manuscript component. "Generated" means the LLM produced a first draft or code scaffold; "Assisted" means the LLM suggested revisions or alternatives that were then edited and verified by the authors; "Human" means the component was produced without LLM assistance.
+The table below summarizes the LLM involvement by manuscript component. "Generated" means the LLM produced a first draft or code scaffold; "Assisted" means the LLM suggested revisions or alternatives that were then edited and verified by the authors; "Human" means the component was produced without LLM assistance.
 
 | Component | LLM role | Human verification |
 |---|---|---|

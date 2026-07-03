@@ -1,6 +1,6 @@
 ## Table 7. Bootstrap p-values, approximate Deflated Sharpe Ratios, and 95 % confidence intervals
 
-| Case | Annualised daily Sharpe | 95 % CI for Sharpe | Bootstrap p-value (H₀: μ ≤ 0) | 95 % CI for p-value | Approx. DSR | Active trading days | Skewness | Kurtosis | ACF(1) |
+| Case | Annualized daily Sharpe | 95 % CI for Sharpe | Bootstrap p-value (H₀: μ ≤ 0) | 95 % CI for p-value | Approx. DSR | Active trading days | Skewness | Kurtosis | ACF(1) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | S11 iter 1077 | 13.75 | [6.72, 25.83] | < 0.0001 | [0.0000, 0.0003] | 11.78 | 45 | −1.46 | 3.44 | −0.22 |
 | S11 iter 1066 | 9.97 | [4.48, 17.25] | < 0.0001 | [0.0000, 0.0003] | 8.32 | 63 | −0.91 | 5.25 | −0.24 |

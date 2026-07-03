@@ -15,4 +15,4 @@
 | 11 | BNB | 3 797 | 212 | 5.58 | 2.95 | 1 133 |
 | 12 | BTC | 9 957 | 93 | 0.93 | 1.23 | 1 736 |
 
-*Note: Season 1 was a manual initialisation/baseline phase (32 iterations, score 0.5607) before the automated loop started at Season 2. Scores in S5–S7 used a different scale from S9–S12; the table therefore reports holdout Sharpe as the cross-season comparable metric.*
+*Note: Season 1 was a manual initialization/baseline phase (32 iterations, score 0.5607) before the automated loop started at Season 2. Scores in S5–S7 used a different scale from S9–S12; the table therefore reports holdout Sharpe as the cross-season comparable metric.*

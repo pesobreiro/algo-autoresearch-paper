@@ -115,4 +115,4 @@ best_models/season_12/iter_5502/
 | **S11 iter 1077** | BNB | — | **+58.2%** | **2.87** | **-6.74%** | ~32 |
 | S12 iter 5502 | BTC | €816 | +63% | 1.27 | -9.3% | ~27 |
 
-S11/BNB has the better OOS Sharpe and the smaller drawdown; S12/BTC produced slightly higher total return in the independent-backtest scenario. BNB's price microstructure is more favourable to mean-reversion than BTC's, which carries more institutional and macro noise.
+S11/BNB has the better OOS Sharpe and the smaller drawdown; S12/BTC produced slightly higher total return in the independent-backtest scenario. BNB's price microstructure is more favorable to mean-reversion than BTC's, which carries more institutional and macro noise.

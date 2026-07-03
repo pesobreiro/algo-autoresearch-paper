@@ -1,9 +1,9 @@
 # CHANGELOG
 
-## 2026-06-26 — Manuscript normalisation and MDPI Analytics submission package
+## 2026-06-26 — Manuscript normalization and MDPI Analytics submission package
 
 ### Changed
-- Normalised `manuscript/paper_draft_analytics.md`, `paper_draft_analytics_figures.md`, and `paper_draft_analytics.tex` for MDPI Analytics style:
+- Normalized `manuscript/paper_draft_analytics.md`, `paper_draft_analytics_figures.md`, and `paper_draft_analytics.tex` for MDPI Analytics style:
   - Added author information and removed citations from the abstract (now ≤ 200 words).
   - Updated aggregate experiment counts to 34 333 iterations and 329 accepted strategies (from `season_summary.json`).
   - Aligned S11 iter 1077 reporting with `deployment/evaluate_models.py`: 161 trades, max drawdown −6.74%, and true-OOS 2026 Sharpe 4.17.
@@ -64,7 +64,7 @@ Features: ema_diff_15m, macd_pct_4h, bb_width_pct_15m, dist_sma200_pct, btc_tren
 - **`pipeline/research_params.py`**: reset for S11 from S10 iter=417 (best holdout: AUC=0.563, Sharpe(val)=1.50, Sharpe(holdout)=2.82, equity 2025→€600)
 
 ### Added — Lesson from S10: Val Overfitting with Ratchet
-- S10 (1148 iters, 3 accepted): baseline increased with each acceptance (ratchet) → LLM forced to find increasingly optimised configs for 2022-2024
+- S10 (1148 iters, 3 accepted): baseline increased with each acceptance (ratchet) → LLM forced to find increasingly optimized configs for 2022-2024
 - Progression of the 3 accepted: iter=326 (holdout=+2.41) → iter=582 (holdout=+0.17) → iter=727 (holdout=-1.02) — clear degradation
 - **S11 fix (Option A)**: holdout enters as gate (`≥0.5`), no ratchet; 2025 is no longer true holdout but eliminates progressive val overfitting
 - Starting point: iter=417 S10 — simpler features (11 vs 16), best holdout of all S10
@@ -89,7 +89,7 @@ Features: ema_diff_15m, macd_pct_4h, bb_width_pct_15m, dist_sma200_pct, btc_tren
 
 ### Changed
 - **`config.yaml`**: `ticker: btc → bnb`, `season: 8 → 9`, `train_start: 2020`, `train_end: 2022`, `validation_years: [2023, 2024]`, `holdout_years: [2025]`, `baseline_override: 0.0`, `accept_auc_min: 0.55`, `accept_sharpe_min: 1.0`, `min_sharpe_gate: 0.3`
-- **`pipeline/backtest.py`**: replaced single `years` with `validation_years` + `holdout_years`; Optuna uses only `data_por_ano_val`; score mode maximises `min(sharpe_val)` (worst sub-window) instead of mean; final metrics computed for val and holdout separately; `fee_pct=0.002` (0.2% round-trip) in all `simulate_numba`; return dict with `sharpe_validation` and `sharpe_holdout`
+- **`pipeline/backtest.py`**: replaced single `years` with `validation_years` + `holdout_years`; Optuna uses only `data_por_ano_val`; score mode maximizes `min(sharpe_val)` (worst sub-window) instead of mean; final metrics computed for val and holdout separately; `fee_pct=0.002` (0.2% round-trip) in all `simulate_numba`; return dict with `sharpe_validation` and `sharpe_holdout`
 - **`pipeline/run_pipeline.py`**: `hash_entry_params()` accepts `train_start`+`train_end` — label cache invalidated between seasons with different train windows
 - **`autoresearch/tracker.py`**: `top_n_scores()` and `melhor_score()` sort by `sharpe_validation` (with fallback to `score_composto`)
 - **`autoresearch/runner.py`**: S9 acceptance uses dual-gate (`cv_auc_mean ≥ accept_auc_min AND sharpe_validation ≥ accept_sharpe_min`); holdout is passive — never used for filtering; `score_baseline` tracks `sharpe_validation`; console shows AUC + Sharpe(val) + Sharpe(holdout/passive); `limpar_cache()` passes `train_start/train_end` to hash
@@ -97,7 +97,7 @@ Features: ema_diff_15m, macd_pct_4h, bb_width_pct_15m, dist_sma200_pct, btc_tren
 - **`program.md`**: rewritten for S9 — BNB asset, acceptance by AUC+Sharpe(val) gates, immutable data split, ATR kill-switch, passive holdout
 
 ### Fixed — 5 methodological improvements
-1. **Holdout integrity (critical)**: Optuna never touches 2025. Seasons S2–S8 had OOS contamination (Optuna optimised on 2025+2026 which were "OOS")
+1. **Holdout integrity (critical)**: Optuna never touches 2025. Seasons S2–S8 had OOS contamination (Optuna optimized on 2025+2026 which were "OOS")
 2. **Optuna anti-overfitting**: N_TRIALS=200 (2 years of val cannot support more); objective = `min(sharpe_val)` (worst sub-window) instead of mean
 3. **Round-trip fees**: `fee_pct=0.002` (0.2%) in all `simulate_numba` — previously only 0.1% on exit (missing entry fee)
 4. **Modern train window**: 2020–2022 (excludes 2017–2019 with microstructure/liquidity different from modern markets)
@@ -151,7 +151,7 @@ The `s7.txt` log confirms one restart: loop resumed at iter 966 after previous c
    - Functions `simulate_numba`, `simulate_numba_equity`, `simulate_trades_numba` are `@njit`.
    - The LLVM compiler keeps all compilation artefacts in memory (IR + machine code).
    - If arrays with distinct shapes are passed across iterations, Numba compiles
-     new specialisations that stay in memory for the process lifetime.
+     new specializations that stay in memory for the process lifetime.
 
 4. **`runner.py` — no `gc.collect()` between iterations** _(amplifier)_
    - The main loop never calls `gc.collect()`. With reference cycles created
@@ -168,8 +168,8 @@ The `s7.txt` log confirms one restart: loop resumed at iter 966 after previous c
 ## 2026-03-15 (Season 5 — profit objective)
 
 ### Added
-- **`OBJECTIVE_MODE` in Optuna** (`pipeline/backtest.py`): `correr_backtest()` accepts new parameter `objective_mode='score'|'profit'`. In `profit` mode, Optuna directly maximises `retorno_total_oos_pct` (average OOS return %) instead of the composite score. Composite score is still computed and reported in both modes.
-- **Minimum Sharpe gate in profit mode** (`pipeline/backtest.py`): strategies with Sharpe < 0.5 are rejected by Optuna (`-999.0`). Avoids selecting roller-coaster strategies that maximise return at the cost of an erratic equity curve. Configurable via `config.scoring.min_sharpe_gate`.
+- **`OBJECTIVE_MODE` in Optuna** (`pipeline/backtest.py`): `correr_backtest()` accepts new parameter `objective_mode='score'|'profit'`. In `profit` mode, Optuna directly maximizes `retorno_total_oos_pct` (average OOS return %) instead of the composite score. Composite score is still computed and reported in both modes.
+- **Minimum Sharpe gate in profit mode** (`pipeline/backtest.py`): strategies with Sharpe < 0.5 are rejected by Optuna (`-999.0`). Avoids selecting roller-coaster strategies that maximize return at the cost of an erratic equity curve. Configurable via `config.scoring.min_sharpe_gate`.
 - **DD gate in profit mode** (`pipeline/backtest.py`): `max_dd < max_dd_gate` (default -30%) returns `-999.0`. Configurable via `config.scoring.max_dd_gate`.
 - **`min_trades_profit`** (`pipeline/backtest.py`): minimum trades in profit mode read from `config.scoring.min_trades_profit` (default inherits `min_trades`). Avoids overfitting to 3 "lucky" high-return trades.
 
@@ -206,7 +206,7 @@ The `s7.txt` log confirms one restart: loop resumed at iter 966 after previous c
 - **Temperature curriculum** (`runner.py`, `agent.py`): LLM temperature adjusted automatically based on score trend. When score improves, temperature drops by `t_decay=0.92` (exploit). When `stagnation_threshold=5` iterations pass without improvement, temperature rises by `t_grow=1.08` (explore). Limits `[t_min=0.3, t_max=1.2]` configurable in `config.yaml`. Current temperature shown in each iteration header.
 - **Rejection feedback loop** (`runner.py`, `agent.py`): last 5 validation rejections are accumulated and included in the next LLM prompt as `⚠️ RECENT REJECTIONS — DO NOT REPEAT`. Prevents the LLM from repeating invalid features (`macd_diff`, `macd_signal`) in consecutive iterations. List is cleared when a proposal passes validation.
 - **Macro regime features** (`features_catalog.py`, `generate_labels.py`, `agent.py`):
-  - `dist_sma200_pct` (1d-only): distance to SMA200 normalised by price (%), calculated from 1d ticker close
+  - `dist_sma200_pct` (1d-only): distance to SMA200 normalized by price (%), calculated from 1d ticker close
   - `btc_trend` (1d-only): BTC above/below EMA50 (0/1), cross-asset, loaded from `btc_01d_usdt_binance.parquet`
   - `atr_regime` (all TFs): current ATR / rolling_mean(ATR, 50) — relative volatility ratio
   - Added `FEATURES_1D_ONLY` to catalog (silent skip for TFs != 1d)
@@ -230,11 +230,11 @@ The `s7.txt` log confirms one restart: loop resumed at iter 966 after previous c
 
 ### Added
 - **Dynamic position sizing** (`backtest.py`): capital allocation scales between 50%-100% of base slot according to model confidence above threshold. Trades with prob=0.95 receive 2× more capital than trades with prob=threshold+ε. Reduces drawdown without reducing number of trades.
-- **Sample weights by PnL** (`train.py`): XGBoost penalised proportionally to each trade's PnL magnitude. Trades with large losses receive more weight — aligns loss function with drawdown protection.
+- **Sample weights by PnL** (`train.py`): XGBoost penalized proportionally to each trade's PnL magnitude. Trades with large losses receive more weight — aligns loss function with drawdown protection.
 - **Feature importance in LLM prompt** (`train.py`, `agent.py`): top 8 features and weak features (<0.02) included in agent context after each training.
 - **Optuna parameter importance in prompt** (`backtest.py`, `agent.py`): relative importance of SL_RANGE/TP_RANGE/THRESHOLD_RANGE included in context after each backtest.
 - **Score breakdown by component** (`agent.py`): LLM sees Sharpe/Return/DD contribution vs maximum possible.
-- **Bayesian Optimisation (Optuna TPE)** (`backtest.py`): replaces static SL/TP grid; 120 trials per backtest with inter-year degradation penalty (15%).
+- **Bayesian Optimization (Optuna TPE)** (`backtest.py`): replaces static SL/TP grid; 120 trials per backtest with inter-year degradation penalty (15%).
 - **Minimum TP/SL ratio 1.5×** in Optuna objective: prevents configs with almost zero R:R.
 - `show_best.py`: script to display best setups with rich table and full detail.
 - `program.md` and `README.md` updated to reflect Optuna architecture.
