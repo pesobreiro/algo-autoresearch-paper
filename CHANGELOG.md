@@ -17,7 +17,7 @@
 - Streamlined README wording and removed generic phrasing.
 
 ### Changed
-- Updated author contributions and funding statement; added Antonio Pratas as last author with ORCID.
+- Updated author contributions and funding statement; added António Pratas as last author with ORCID.
 
 ## 2026-07-03 — Release v1.0.0
 

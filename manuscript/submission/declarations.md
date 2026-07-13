@@ -16,7 +16,7 @@ Not applicable. This research did not involve human subjects.
 
 ## Author Contributions (CRediT)
 
-Conceptualization, methodology, software, validation, formal analysis, investigation, data curation, writing — original draft, writing — review and editing, visualization, supervision: Pedro Sobreiro. Methodology, writing — review and editing, supervision: Domingos Martinho. Methodology, writing — review and editing: Pedro Ramos, Antonio Pratas. All authors have read and agreed to the published version of the manuscript.
+Conceptualization, methodology, software, validation, formal analysis, investigation, data curation, writing — original draft, writing — review and editing, visualization, supervision: Pedro Sobreiro. Methodology, writing — review and editing, supervision: Domingos Martinho. Methodology, writing — review and editing: Pedro Ramos, António Pratas. All authors have read and agreed to the published version of the manuscript.
 
 ## Conflict of Interest Statement
 
