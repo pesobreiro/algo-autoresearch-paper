@@ -1,6 +1,6 @@
 # algo-autoresearch-paper
 
-Code, data specification, and reproducibility artifacts for *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*.
+Code, data specification, and reproducibility artifacts for *A Season-Structured Validation and Governance Architecture for Autonomous Strategy-Proposal Generation in Algorithmic Trading*.
 
 ## Repository contents
 
@@ -53,7 +53,7 @@ Raw OHLCV data comes from the public Binance API. No API key is required. The do
 
 ## Citation
 
-Pedro Sobreiro, Domingos Martinho, Pedro Ramos. *A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines*. 2026.
+Pedro Sobreiro, Domingos Martinho, Pedro Ramos, Antonio Pratas. *A Season-Structured Validation and Governance Architecture for Autonomous Strategy-Proposal Generation in Algorithmic Trading*. 2026.
 
 ## License
 

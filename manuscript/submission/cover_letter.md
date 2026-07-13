@@ -1,6 +1,6 @@
 Dear Editor-in-Chief,
 
-We wish to submit our manuscript entitled "A Season-Structured Validation and Governance Architecture for Autonomous Prescriptive Algorithmic Trading Pipelines" for consideration for publication in MDPI Analytics.
+We wish to submit our manuscript entitled "A Season-Structured Validation and Governance Architecture for Autonomous Strategy-Proposal Generation in Algorithmic Trading" for consideration for publication in MDPI Analytics.
 
 The paper presents a season-structured validation architecture for prescriptive analytics research. A locally deployed large language model proposes directional cryptocurrency trading strategies within experimental seasons, while a multi-layer validation system and a human reviewer at season boundaries constrain the search and update the objectives and acceptance gates. We believe the work is a good fit for Analytics because it combines predictive modeling, simulation-based optimization, and temporally-ordered feature validation into a single reproducible decision-support system, with a disciplined treatment of look-ahead bias, overfitting, and multiple testing in automated strategy research.
 
